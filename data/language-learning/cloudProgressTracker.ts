@@ -66,34 +66,48 @@ export class CloudProgressTracker {
     conflictResolved?: boolean;
   }> {
     try {
+      console.log("🔄 Cloud sync başlatılıyor...");
+
       // localStorage'dan verileri al
       const localData = JSON.parse(
         localStorage.getItem("language-learning-progress") || "[]"
       );
+      console.log("💾 Local'deki veri sayısı:", localData.length);
 
       // Firebase'den verileri al
       const cloudData = await this.loadProgressFromCloud();
+      console.log("☁️ Cloud'dan alınan veri sayısı:", cloudData.length);
 
       if (localData.length === 0 && cloudData.length === 0) {
+        console.log("ℹ️ Hem cloud hem local boş");
         return { success: true, source: "local" };
       }
 
       if (localData.length === 0 && cloudData.length > 0) {
         // Sadece cloud'da veri var, local'e kopyala
+        console.log("📥 Cloud'dan local'e veri kopyalanıyor");
         localStorage.setItem(
           "language-learning-progress",
           JSON.stringify(cloudData)
         );
+
+        // UI'ı güncelle
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("localStorageChanged"));
+        }
+
         return { success: true, source: "cloud" };
       }
 
       if (localData.length > 0 && cloudData.length === 0) {
         // Sadece local'de veri var, cloud'a yükle
+        console.log("📤 Local'den cloud'a veri yükleniyor");
         await this.saveProgressToCloud(localData);
         return { success: true, source: "local" };
       }
 
       // Her ikisinde de veri var, merge et
+      console.log("🔀 Veriler merge ediliyor");
       const mergedData = this.mergeProgressData(localData, cloudData);
 
       // Merge edilen veriyi her iki yere de kaydet
@@ -103,6 +117,12 @@ export class CloudProgressTracker {
       );
       await this.saveProgressToCloud(mergedData);
 
+      // UI'ı güncelle
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("localStorageChanged"));
+      }
+
+      console.log("✅ Sync tamamlandı, toplam veri:", mergedData.length);
       return {
         success: true,
         source: "merged",

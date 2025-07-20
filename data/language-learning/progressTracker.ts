@@ -35,40 +35,59 @@ export class ProgressTracker {
   // Cloud sync init (sayfa yüklendiğinde çağırın)
   static async initCloudSync(): Promise<void> {
     try {
-      const { CloudProgressTracker } = await import('./cloudProgressTracker');
+      const { CloudProgressTracker } = await import("./cloudProgressTracker");
       await CloudProgressTracker.syncData();
     } catch (error) {
-      console.warn('Cloud sync mevcut değil, sadece localStorage kullanılacak:', error);
+      console.warn(
+        "Cloud sync mevcut değil, sadece localStorage kullanılacak:",
+        error
+      );
     }
   }
 
   // Progress verisini export et
   static async exportProgress(): Promise<string> {
     try {
-      const { CloudProgressTracker } = await import('./cloudProgressTracker');
+      const { CloudProgressTracker } = await import("./cloudProgressTracker");
       return await CloudProgressTracker.exportData();
     } catch (error) {
-      console.warn('Cloud export mevcut değil, localStorage export yapılıyor:', error);
+      console.warn(
+        "Cloud export mevcut değil, localStorage export yapılıyor:",
+        error
+      );
       const data = this.getAllProgress();
-      return JSON.stringify({
-        exportDate: new Date().toISOString(),
-        version: '1.0',
-        progressData: data
-      }, null, 2);
+      return JSON.stringify(
+        {
+          exportDate: new Date().toISOString(),
+          version: "1.0",
+          progressData: data,
+        },
+        null,
+        2
+      );
     }
   }
 
   // Progress verisini import et
   static async importProgress(jsonData: string): Promise<boolean> {
     try {
-      const { CloudProgressTracker } = await import('./cloudProgressTracker');
+      const { CloudProgressTracker } = await import("./cloudProgressTracker");
       return await CloudProgressTracker.importData(jsonData);
     } catch (error) {
-      console.warn('Cloud import mevcut değil, localStorage import yapılıyor:', error);
+      console.warn(
+        "Cloud import mevcut değil, localStorage import yapılıyor:",
+        error
+      );
       try {
         const importedData = JSON.parse(jsonData);
-        if (importedData.progressData && Array.isArray(importedData.progressData)) {
-          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(importedData.progressData));
+        if (
+          importedData.progressData &&
+          Array.isArray(importedData.progressData)
+        ) {
+          localStorage.setItem(
+            this.STORAGE_KEY,
+            JSON.stringify(importedData.progressData)
+          );
           return true;
         }
         return false;
@@ -110,12 +129,17 @@ export class ProgressTracker {
 
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(progress));
 
+    // UI'ı güncelle
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("localStorageChanged"));
+    }
+
     // Cloud sync (async)
     try {
-      const { CloudProgressTracker } = await import('./cloudProgressTracker');
+      const { CloudProgressTracker } = await import("./cloudProgressTracker");
       CloudProgressTracker.autoSync(taskProgress);
     } catch (error) {
-      console.warn('Cloud sync mevcut değil:', error);
+      console.warn("Cloud sync mevcut değil:", error);
     }
   }
 
@@ -148,12 +172,17 @@ export class ProgressTracker {
 
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(progress));
 
+    // UI'ı güncelle
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("localStorageChanged"));
+    }
+
     // Cloud sync (async)
     try {
-      const { CloudProgressTracker } = await import('./cloudProgressTracker');
+      const { CloudProgressTracker } = await import("./cloudProgressTracker");
       CloudProgressTracker.autoSync(taskProgress);
     } catch (error) {
-      console.warn('Cloud sync mevcut değil:', error);
+      console.warn("Cloud sync mevcut değil:", error);
     }
   }
 

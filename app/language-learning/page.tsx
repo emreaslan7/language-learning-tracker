@@ -8,8 +8,6 @@ import {
   vocabularyStats,
 } from "../../data/language-learning/vocabulary";
 import { VocabularyCard } from "../../data/language-learning/vocabulary/types";
-import { FirebaseTest } from "../../components/FirebaseTest";
-import { TestProgressGenerator } from "../../components/TestProgressGenerator";
 
 interface WeekData {
   week: number;
@@ -49,18 +47,20 @@ const YearlyProgressChart = () => {
     currentStreak: 0,
   });
   const [mounted, setMounted] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<
-    "idle" | "syncing" | "success" | "error"
-  >("idle");
+
+  // Progress verilerini yenile
+  const refreshProgressData = () => {
+    const data = ProgressTracker.getYearlyProgress();
+    const statsData = ProgressTracker.getOverallStats();
+    setProgressData(data);
+    setStats(statsData);
+  };
 
   useEffect(() => {
     setMounted(true);
 
     // İlk önce localStorage'dan verileri hemen yükle
-    const initialData = ProgressTracker.getYearlyProgress();
-    const initialStats = ProgressTracker.getOverallStats();
-    setProgressData(initialData);
-    setStats(initialStats);
+    refreshProgressData();
 
     const loadData = async () => {
       // Cloud sync'i başlat
@@ -69,35 +69,37 @@ const YearlyProgressChart = () => {
         console.log("✅ Cloud sync başlatıldı");
 
         // Cloud sync'ten sonra verileri yeniden yükle
-        const data = ProgressTracker.getYearlyProgress();
-        const statsData = ProgressTracker.getOverallStats();
-        setProgressData(data);
-        setStats(statsData);
+        refreshProgressData();
       } catch (error) {
         console.warn("⚠️ Cloud sync başlatılamadı:", error);
       }
     };
 
     loadData();
-  }, []);
 
-  // Cloud sync fonksiyonu
-  const handleCloudSync = async () => {
-    setSyncStatus("syncing");
-    try {
-      await ProgressTracker.initCloudSync();
-      const data = ProgressTracker.getYearlyProgress();
-      const statsData = ProgressTracker.getOverallStats();
-      setProgressData(data);
-      setStats(statsData);
-      setSyncStatus("success");
-      setTimeout(() => setSyncStatus("idle"), 2000);
-    } catch (error) {
-      console.error("Sync hatası:", error);
-      setSyncStatus("error");
-      setTimeout(() => setSyncStatus("idle"), 2000);
-    }
-  };
+    // localStorage değişikliklerini dinle
+    const handleStorageChange = () => {
+      refreshProgressData();
+    };
+
+    // localStorage değişiklik eventini dinle
+    window.addEventListener("storage", handleStorageChange);
+
+    // Custom event dinle (aynı tab'da değişiklikler için)
+    const handleCustomStorageChange = () => {
+      setTimeout(() => refreshProgressData(), 100); // Küçük delay ekle
+    };
+    window.addEventListener("localStorageChanged", handleCustomStorageChange);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener(
+        "localStorageChanged",
+        handleCustomStorageChange
+      );
+    };
+  }, []);
 
   if (!mounted) {
     return (
@@ -127,44 +129,6 @@ const YearlyProgressChart = () => {
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 md:mb-0">
           365-Day Progress Map
         </h2>
-
-        {/* Cloud Sync Control */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleCloudSync}
-            disabled={syncStatus === "syncing"}
-            className={`px-4 py-2 rounded text-sm font-medium ${
-              syncStatus === "syncing"
-                ? "bg-blue-100 text-blue-600 cursor-not-allowed"
-                : syncStatus === "success"
-                ? "bg-green-100 text-green-600"
-                : syncStatus === "error"
-                ? "bg-red-100 text-red-600"
-                : "bg-blue-500 text-white hover:bg-blue-600"
-            }`}
-          >
-            {syncStatus === "syncing"
-              ? "Syncing..."
-              : syncStatus === "success"
-              ? "✅ Synced"
-              : syncStatus === "error"
-              ? "❌ Error"
-              : "☁️ Cloud Sync"}
-          </button>
-          <FirebaseTest />
-          <button
-            onClick={() => TestProgressGenerator.generateRandomProgress()}
-            className="bg-green-500 text-white px-4 py-2 rounded text-sm hover:bg-green-600"
-          >
-            🎲 Test Data
-          </button>
-          <button
-            onClick={() => TestProgressGenerator.clearAllProgress()}
-            className="bg-red-500 text-white px-4 py-2 rounded text-sm hover:bg-red-600"
-          >
-            🗑️ Clear
-          </button>
-        </div>
       </div>
 
       <div className="text-gray-600 dark:text-gray-300 mb-6">
