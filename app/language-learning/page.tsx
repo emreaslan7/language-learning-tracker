@@ -8,6 +8,7 @@ import {
   vocabularyStats,
 } from "../../data/language-learning/vocabulary";
 import { VocabularyCard } from "../../data/language-learning/vocabulary/types";
+import { FirebaseTest } from "../../components/FirebaseTest";
 
 interface WeekData {
   week: number;
@@ -120,7 +121,7 @@ const YearlyProgressChart = () => {
         </h2>
 
         {/* Cloud Sync Control */}
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <button
             onClick={handleCloudSync}
             disabled={syncStatus === "syncing"}
@@ -142,6 +143,7 @@ const YearlyProgressChart = () => {
               ? "❌ Error"
               : "☁️ Cloud Sync"}
           </button>
+          <FirebaseTest />
         </div>
       </div>
 

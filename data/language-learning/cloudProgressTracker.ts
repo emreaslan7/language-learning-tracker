@@ -157,6 +157,8 @@ export class CloudProgressTracker {
   // Otomatik senkronizasyon (her değişiklikten sonra)
   static async autoSync(taskProgress: TaskProgress): Promise<void> {
     try {
+      console.log("🔄 AutoSync başlatılıyor:", taskProgress);
+
       // Önce localStorage'a kaydet
       const currentData = JSON.parse(
         localStorage.getItem("language-learning-progress") || "[]"
@@ -171,21 +173,26 @@ export class CloudProgressTracker {
 
       if (existingIndex >= 0) {
         currentData[existingIndex] = taskProgress;
+        console.log("📝 Mevcut kayıt güncellendi");
       } else {
         currentData.push(taskProgress);
+        console.log("➕ Yeni kayıt eklendi");
       }
 
       localStorage.setItem(
         "language-learning-progress",
         JSON.stringify(currentData)
       );
+      console.log("💾 localStorage güncellendi");
 
-      // Sonra Firebase'e kaydet (async olarak)
-      setTimeout(async () => {
-        await this.saveProgressToCloud(currentData);
-      }, 1000); // 1 saniye delay ile
+      // Firebase'e hemen kaydet (delay kaldırıldı)
+      console.log("☁️ Firebase sync başlatılıyor...");
+      await this.saveProgressToCloud(currentData);
+      console.log("✅ AutoSync tamamlandı");
     } catch (error) {
       console.error("❌ Auto sync hatası:", error);
+      // Hata durumunda bile localStorage kaydını koru
+      throw error; // Hatayı yukarı fırlat ki UI'da gösterilebilsin
     }
   }
 
