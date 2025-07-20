@@ -9,6 +9,7 @@ import {
 } from "../../data/language-learning/vocabulary";
 import { VocabularyCard } from "../../data/language-learning/vocabulary/types";
 import { FirebaseTest } from "../../components/FirebaseTest";
+import { TestProgressGenerator } from "../../components/TestProgressGenerator";
 
 interface WeekData {
   week: number;
@@ -54,20 +55,27 @@ const YearlyProgressChart = () => {
 
   useEffect(() => {
     setMounted(true);
+
+    // İlk önce localStorage'dan verileri hemen yükle
+    const initialData = ProgressTracker.getYearlyProgress();
+    const initialStats = ProgressTracker.getOverallStats();
+    setProgressData(initialData);
+    setStats(initialStats);
+
     const loadData = async () => {
       // Cloud sync'i başlat
       try {
         await ProgressTracker.initCloudSync();
         console.log("✅ Cloud sync başlatıldı");
+
+        // Cloud sync'ten sonra verileri yeniden yükle
+        const data = ProgressTracker.getYearlyProgress();
+        const statsData = ProgressTracker.getOverallStats();
+        setProgressData(data);
+        setStats(statsData);
       } catch (error) {
         console.warn("⚠️ Cloud sync başlatılamadı:", error);
       }
-
-      // Progress verilerini yükle
-      const data = ProgressTracker.getYearlyProgress();
-      const statsData = ProgressTracker.getOverallStats();
-      setProgressData(data);
-      setStats(statsData);
     };
 
     loadData();
@@ -144,6 +152,18 @@ const YearlyProgressChart = () => {
               : "☁️ Cloud Sync"}
           </button>
           <FirebaseTest />
+          <button
+            onClick={() => TestProgressGenerator.generateRandomProgress()}
+            className="bg-green-500 text-white px-4 py-2 rounded text-sm hover:bg-green-600"
+          >
+            🎲 Test Data
+          </button>
+          <button
+            onClick={() => TestProgressGenerator.clearAllProgress()}
+            className="bg-red-500 text-white px-4 py-2 rounded text-sm hover:bg-red-600"
+          >
+            🗑️ Clear
+          </button>
         </div>
       </div>
 
@@ -196,24 +216,65 @@ const YearlyProgressChart = () => {
 
           {/* Progress squares grouped by weeks */}
           <div className="grid grid-cols-52 gap-1 min-w-[800px]">
-            {Array.from({ length: 52 }, (_, weekIndex) => (
-              <div
-                key={weekIndex}
-                className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1"
-              >
-                {progressData
-                  .filter((day) => day.weekNumber === weekIndex + 1)
-                  .map((day, dayIndex) => (
-                    <div
-                      key={dayIndex}
-                      className={`w-2 h-2 rounded-sm ${ProgressTracker.getCompletionColor(
-                        day.completionPercentage
-                      )} hover:scale-125 transition-all cursor-pointer mx-auto`}
-                      title={`Week ${day.weekNumber}, Day ${day.dayNumber}: ${day.completionPercentage}%`}
-                    />
-                  ))}
-              </div>
-            ))}
+            {Array.from({ length: 52 }, (_, weekIndex) => {
+              const weekNumber = weekIndex + 1;
+              const weekDays = progressData.filter(
+                (day) => day.weekNumber === weekNumber
+              );
+
+              // Eğer haftada hiç gün yoksa, boş günler oluştur
+              if (weekDays.length === 0) {
+                const emptyDays = Array.from({ length: 7 }, (_, dayIndex) => ({
+                  weekNumber,
+                  dayNumber: dayIndex + 1,
+                  completionPercentage: 0,
+                }));
+
+                return (
+                  <div
+                    key={weekIndex}
+                    className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1"
+                  >
+                    {emptyDays.map((day, dayIndex) => (
+                      <div
+                        key={dayIndex}
+                        className={`w-2 h-2 rounded-sm ${ProgressTracker.getCompletionColor(
+                          day.completionPercentage
+                        )} hover:scale-125 transition-all cursor-pointer mx-auto`}
+                        title={`Week ${day.weekNumber}, Day ${day.dayNumber}: ${day.completionPercentage}%`}
+                      />
+                    ))}
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={weekIndex}
+                  className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1"
+                >
+                  {Array.from({ length: 7 }, (_, dayIndex) => {
+                    const dayNumber = dayIndex + 1;
+                    const dayData = weekDays.find(
+                      (day) => day.dayNumber === dayNumber
+                    );
+                    const completionPercentage = dayData
+                      ? dayData.completionPercentage
+                      : 0;
+
+                    return (
+                      <div
+                        key={dayIndex}
+                        className={`w-2 h-2 rounded-sm ${ProgressTracker.getCompletionColor(
+                          completionPercentage
+                        )} hover:scale-125 transition-all cursor-pointer mx-auto`}
+                        title={`Week ${weekNumber}, Day ${dayNumber}: ${completionPercentage}%`}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -226,25 +287,40 @@ const YearlyProgressChart = () => {
                 Q1 (Weeks 1-13)
               </h4>
               <div className="grid grid-cols-13 gap-1">
-                {Array.from({ length: 13 }, (_, weekIndex) => (
-                  <div key={weekIndex} className="text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      {weekIndex + 1}
+                {Array.from({ length: 13 }, (_, weekIndex) => {
+                  const weekNumber = weekIndex + 1;
+                  const weekDays = progressData.filter(
+                    (day) => day.weekNumber === weekNumber
+                  );
+
+                  return (
+                    <div key={weekIndex} className="text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        {weekNumber}
+                      </div>
+                      <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1">
+                        {Array.from({ length: 7 }, (_, dayIndex) => {
+                          const dayNumber = dayIndex + 1;
+                          const dayData = weekDays.find(
+                            (day) => day.dayNumber === dayNumber
+                          );
+                          const completionPercentage = dayData
+                            ? dayData.completionPercentage
+                            : 0;
+
+                          return (
+                            <div
+                              key={dayIndex}
+                              className={`w-1.5 h-1.5 rounded-sm ${ProgressTracker.getCompletionColor(
+                                completionPercentage
+                              )} mx-auto`}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1">
-                      {progressData
-                        .filter((day) => day.weekNumber === weekIndex + 1)
-                        .map((day, dayIndex) => (
-                          <div
-                            key={dayIndex}
-                            className={`w-1.5 h-1.5 rounded-sm ${ProgressTracker.getCompletionColor(
-                              day.completionPercentage
-                            )} mx-auto`}
-                          />
-                        ))}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -254,25 +330,40 @@ const YearlyProgressChart = () => {
                 Q2 (Weeks 14-26)
               </h4>
               <div className="grid grid-cols-13 gap-1">
-                {Array.from({ length: 13 }, (_, weekIndex) => (
-                  <div key={weekIndex + 13} className="text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      {weekIndex + 14}
+                {Array.from({ length: 13 }, (_, weekIndex) => {
+                  const weekNumber = weekIndex + 14;
+                  const weekDays = progressData.filter(
+                    (day) => day.weekNumber === weekNumber
+                  );
+
+                  return (
+                    <div key={weekIndex + 13} className="text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        {weekNumber}
+                      </div>
+                      <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1">
+                        {Array.from({ length: 7 }, (_, dayIndex) => {
+                          const dayNumber = dayIndex + 1;
+                          const dayData = weekDays.find(
+                            (day) => day.dayNumber === dayNumber
+                          );
+                          const completionPercentage = dayData
+                            ? dayData.completionPercentage
+                            : 0;
+
+                          return (
+                            <div
+                              key={dayIndex}
+                              className={`w-1.5 h-1.5 rounded-sm ${ProgressTracker.getCompletionColor(
+                                completionPercentage
+                              )} mx-auto`}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1">
-                      {progressData
-                        .filter((day) => day.weekNumber === weekIndex + 14)
-                        .map((day, dayIndex) => (
-                          <div
-                            key={dayIndex}
-                            className={`w-1.5 h-1.5 rounded-sm ${ProgressTracker.getCompletionColor(
-                              day.completionPercentage
-                            )} mx-auto`}
-                          />
-                        ))}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -282,25 +373,40 @@ const YearlyProgressChart = () => {
                 Q3 (Weeks 27-39)
               </h4>
               <div className="grid grid-cols-13 gap-1">
-                {Array.from({ length: 13 }, (_, weekIndex) => (
-                  <div key={weekIndex + 26} className="text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      {weekIndex + 27}
+                {Array.from({ length: 13 }, (_, weekIndex) => {
+                  const weekNumber = weekIndex + 27;
+                  const weekDays = progressData.filter(
+                    (day) => day.weekNumber === weekNumber
+                  );
+
+                  return (
+                    <div key={weekIndex + 26} className="text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        {weekNumber}
+                      </div>
+                      <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1">
+                        {Array.from({ length: 7 }, (_, dayIndex) => {
+                          const dayNumber = dayIndex + 1;
+                          const dayData = weekDays.find(
+                            (day) => day.dayNumber === dayNumber
+                          );
+                          const completionPercentage = dayData
+                            ? dayData.completionPercentage
+                            : 0;
+
+                          return (
+                            <div
+                              key={dayIndex}
+                              className={`w-1.5 h-1.5 rounded-sm ${ProgressTracker.getCompletionColor(
+                                completionPercentage
+                              )} mx-auto`}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1">
-                      {progressData
-                        .filter((day) => day.weekNumber === weekIndex + 27)
-                        .map((day, dayIndex) => (
-                          <div
-                            key={dayIndex}
-                            className={`w-1.5 h-1.5 rounded-sm ${ProgressTracker.getCompletionColor(
-                              day.completionPercentage
-                            )} mx-auto`}
-                          />
-                        ))}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -310,25 +416,40 @@ const YearlyProgressChart = () => {
                 Q4 (Weeks 40-52)
               </h4>
               <div className="grid grid-cols-13 gap-1">
-                {Array.from({ length: 13 }, (_, weekIndex) => (
-                  <div key={weekIndex + 39} className="text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      {weekIndex + 40}
+                {Array.from({ length: 13 }, (_, weekIndex) => {
+                  const weekNumber = weekIndex + 40;
+                  const weekDays = progressData.filter(
+                    (day) => day.weekNumber === weekNumber
+                  );
+
+                  return (
+                    <div key={weekIndex + 39} className="text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        {weekNumber}
+                      </div>
+                      <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1">
+                        {Array.from({ length: 7 }, (_, dayIndex) => {
+                          const dayNumber = dayIndex + 1;
+                          const dayData = weekDays.find(
+                            (day) => day.dayNumber === dayNumber
+                          );
+                          const completionPercentage = dayData
+                            ? dayData.completionPercentage
+                            : 0;
+
+                          return (
+                            <div
+                              key={dayIndex}
+                              className={`w-1.5 h-1.5 rounded-sm ${ProgressTracker.getCompletionColor(
+                                completionPercentage
+                              )} mx-auto`}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1">
-                      {progressData
-                        .filter((day) => day.weekNumber === weekIndex + 40)
-                        .map((day, dayIndex) => (
-                          <div
-                            key={dayIndex}
-                            className={`w-1.5 h-1.5 rounded-sm ${ProgressTracker.getCompletionColor(
-                              day.completionPercentage
-                            )} mx-auto`}
-                          />
-                        ))}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
