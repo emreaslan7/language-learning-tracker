@@ -4,27 +4,14 @@ import { TaskProgress } from "./progressTracker";
 
 export class CloudProgressTracker {
   private static COLLECTION_NAME = "progress_data";
-
-  // User ID al (localStorage'dan unique ID)
-  private static getUserId(): string {
-    // localStorage'dan unique ID al veya oluştur
-    let userId = localStorage.getItem("unique_user_id");
-    if (!userId) {
-      userId =
-        "user_" + Math.random().toString(36).substr(2, 9) + "_" + Date.now();
-      localStorage.setItem("unique_user_id", userId);
-    }
-    return userId;
-  }
+  private static DOCUMENT_ID = "main_progress"; // Sabit document ID
 
   // Progress verilerini Firebase'e kaydet
   static async saveProgressToCloud(progress: TaskProgress[]): Promise<boolean> {
     try {
-      const userId = this.getUserId();
-      const docRef = doc(db, this.COLLECTION_NAME, userId);
+      const docRef = doc(db, this.COLLECTION_NAME, this.DOCUMENT_ID);
 
       await setDoc(docRef, {
-        userId,
         progress,
         lastUpdated: new Date(),
         version: 1,
@@ -41,8 +28,7 @@ export class CloudProgressTracker {
   // Progress verilerini Firebase'den al
   static async loadProgressFromCloud(): Promise<TaskProgress[]> {
     try {
-      const userId = this.getUserId();
-      const docRef = doc(db, this.COLLECTION_NAME, userId);
+      const docRef = doc(db, this.COLLECTION_NAME, this.DOCUMENT_ID);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -227,7 +213,6 @@ export class CloudProgressTracker {
       const exportData = {
         exportDate: new Date().toISOString(),
         version: "1.0",
-        userId: this.getUserId(),
         progressData: data,
       };
 
