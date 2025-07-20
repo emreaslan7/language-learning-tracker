@@ -1,8 +1,15 @@
 // Progress tracking için localStorage tabanlı sistem
+export type TaskType =
+  | "warmUp"
+  | "mainFocus"
+  | "practice"
+  | "review"
+  | "writing";
+
 export interface TaskProgress {
   weekNumber: number;
   dayNumber: number;
-  taskType: "warmUp" | "mainFocus" | "practice" | "review" | "writing";
+  taskType: TaskType;
   completed: boolean;
   completedAt?: Date;
 }
@@ -25,12 +32,58 @@ export class ProgressTracker {
     return stored ? JSON.parse(stored) : [];
   }
 
+  // Cloud sync init (sayfa yüklendiğinde çağırın)
+  static async initCloudSync(): Promise<void> {
+    try {
+      const { CloudProgressTracker } = await import('./cloudProgressTracker');
+      await CloudProgressTracker.syncData();
+    } catch (error) {
+      console.warn('Cloud sync mevcut değil, sadece localStorage kullanılacak:', error);
+    }
+  }
+
+  // Progress verisini export et
+  static async exportProgress(): Promise<string> {
+    try {
+      const { CloudProgressTracker } = await import('./cloudProgressTracker');
+      return await CloudProgressTracker.exportData();
+    } catch (error) {
+      console.warn('Cloud export mevcut değil, localStorage export yapılıyor:', error);
+      const data = this.getAllProgress();
+      return JSON.stringify({
+        exportDate: new Date().toISOString(),
+        version: '1.0',
+        progressData: data
+      }, null, 2);
+    }
+  }
+
+  // Progress verisini import et
+  static async importProgress(jsonData: string): Promise<boolean> {
+    try {
+      const { CloudProgressTracker } = await import('./cloudProgressTracker');
+      return await CloudProgressTracker.importData(jsonData);
+    } catch (error) {
+      console.warn('Cloud import mevcut değil, localStorage import yapılıyor:', error);
+      try {
+        const importedData = JSON.parse(jsonData);
+        if (importedData.progressData && Array.isArray(importedData.progressData)) {
+          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(importedData.progressData));
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    }
+  }
+
   // Belirli bir görevi tamamla
-  static completeTask(
+  static async completeTask(
     weekNumber: number,
     dayNumber: number,
-    taskType: string
-  ): void {
+    taskType: TaskType
+  ): Promise<void> {
     const progress = this.getAllProgress();
 
     // Mevcut görevi bul
@@ -41,28 +94,37 @@ export class ProgressTracker {
         p.taskType === taskType
     );
 
+    const taskProgress: TaskProgress = {
+      weekNumber,
+      dayNumber,
+      taskType,
+      completed: true,
+      completedAt: new Date(),
+    };
+
     if (existingIndex >= 0) {
-      progress[existingIndex].completed = true;
-      progress[existingIndex].completedAt = new Date();
+      progress[existingIndex] = taskProgress;
     } else {
-      progress.push({
-        weekNumber,
-        dayNumber,
-        taskType: taskType as any,
-        completed: true,
-        completedAt: new Date(),
-      });
+      progress.push(taskProgress);
     }
 
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(progress));
+
+    // Cloud sync (async)
+    try {
+      const { CloudProgressTracker } = await import('./cloudProgressTracker');
+      CloudProgressTracker.autoSync(taskProgress);
+    } catch (error) {
+      console.warn('Cloud sync mevcut değil:', error);
+    }
   }
 
   // Görevi tamamlanmamış olarak işaretle
-  static uncompleteTask(
+  static async uncompleteTask(
     weekNumber: number,
     dayNumber: number,
-    taskType: string
-  ): void {
+    taskType: TaskType
+  ): Promise<void> {
     const progress = this.getAllProgress();
 
     const existingIndex = progress.findIndex(
@@ -72,19 +134,34 @@ export class ProgressTracker {
         p.taskType === taskType
     );
 
+    const taskProgress: TaskProgress = {
+      weekNumber,
+      dayNumber,
+      taskType,
+      completed: false,
+      completedAt: undefined,
+    };
+
     if (existingIndex >= 0) {
-      progress[existingIndex].completed = false;
-      progress[existingIndex].completedAt = undefined;
+      progress[existingIndex] = taskProgress;
     }
 
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(progress));
+
+    // Cloud sync (async)
+    try {
+      const { CloudProgressTracker } = await import('./cloudProgressTracker');
+      CloudProgressTracker.autoSync(taskProgress);
+    } catch (error) {
+      console.warn('Cloud sync mevcut değil:', error);
+    }
   }
 
   // Belirli bir görevin tamamlanma durumunu kontrol et
   static isTaskCompleted(
     weekNumber: number,
     dayNumber: number,
-    taskType: string
+    taskType: TaskType
   ): boolean {
     const progress = this.getAllProgress();
     const task = progress.find(
@@ -102,7 +179,7 @@ export class ProgressTracker {
     weekNumber: number,
     dayNumber: number
   ): number {
-    const allTasks = ["warmUp", "mainFocus", "practice", "review"];
+    const allTasks: TaskType[] = ["warmUp", "mainFocus", "practice", "review"];
 
     // Writing günlerini kontrol et (Pazartesi=1, Salı=2, Perşembe=4, Cumartesi=6)
     const writingDays = [1, 2, 4, 6];
@@ -142,10 +219,10 @@ export class ProgressTracker {
   // Yeşil ton hesaplama (GitHub contributions benzeri)
   static getCompletionColor(percentage: number): string {
     if (percentage === 0) return "bg-gray-100 dark:bg-gray-800"; // Hiç yapılmamış
-    if (percentage <= 25) return "bg-green-100 dark:bg-green-900"; // %25 ve altı
-    if (percentage <= 50) return "bg-green-200 dark:bg-green-800"; // %50 ve altı
-    if (percentage <= 75) return "bg-green-300 dark:bg-green-700"; // %75 ve altı
-    return "bg-green-400 dark:bg-green-600"; // %100 tamamlanmış
+    if (percentage <= 25) return "bg-green-100 dark:bg-green-700"; // %25 ve altı
+    if (percentage <= 50) return "bg-green-200 dark:bg-green-600"; // %50 ve altı
+    if (percentage <= 75) return "bg-green-300 dark:bg-green-500"; // %75 ve altı
+    return "bg-green-400 dark:bg-green-400"; // %100 tamamlanmış
   }
 
   // Haftalık progress özeti

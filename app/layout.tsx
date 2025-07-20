@@ -15,8 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Learning Path Tracker",
-  description:
-    "Track your language learning, LeetCode, and DeepML.com progress",
+  description: "Track your language learning progress",
 };
 
 export default function RootLayout({

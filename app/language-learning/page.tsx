@@ -17,19 +17,123 @@ interface WeekData {
   completed: boolean;
 }
 
+interface ProgressData {
+  weekNumber: number;
+  dayNumber: number;
+  completionPercentage: number;
+}
+
+interface Stats {
+  completedDays: number;
+  partialDays: number;
+  uncompletedDays: number;
+  overallPercentage: number;
+  currentStreak: number;
+}
+
+interface VocabularyProgress {
+  learned: number;
+  confused: number;
+}
+
 // GitHub Contributions Component
 const YearlyProgressChart = () => {
-  const [progressData, setProgressData] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>({});
+  const [progressData, setProgressData] = useState<ProgressData[]>([]);
+  const [stats, setStats] = useState<Stats>({
+    completedDays: 0,
+    partialDays: 0,
+    uncompletedDays: 0,
+    overallPercentage: 0,
+    currentStreak: 0,
+  });
   const [mounted, setMounted] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<
+    "idle" | "syncing" | "success" | "error"
+  >("idle");
 
   useEffect(() => {
     setMounted(true);
-    const data = ProgressTracker.getYearlyProgress();
-    const statsData = ProgressTracker.getOverallStats();
-    setProgressData(data);
-    setStats(statsData);
+    const loadData = async () => {
+      // Cloud sync'i başlat
+      try {
+        await ProgressTracker.initCloudSync();
+        console.log("✅ Cloud sync başlatıldı");
+      } catch (error) {
+        console.warn("⚠️ Cloud sync başlatılamadı:", error);
+      }
+
+      // Progress verilerini yükle
+      const data = ProgressTracker.getYearlyProgress();
+      const statsData = ProgressTracker.getOverallStats();
+      setProgressData(data);
+      setStats(statsData);
+    };
+
+    loadData();
   }, []);
+
+  // Cloud sync fonksiyonu
+  const handleCloudSync = async () => {
+    setSyncStatus("syncing");
+    try {
+      await ProgressTracker.initCloudSync();
+      const data = ProgressTracker.getYearlyProgress();
+      const statsData = ProgressTracker.getOverallStats();
+      setProgressData(data);
+      setStats(statsData);
+      setSyncStatus("success");
+      setTimeout(() => setSyncStatus("idle"), 2000);
+    } catch (error) {
+      console.error("Sync hatası:", error);
+      setSyncStatus("error");
+      setTimeout(() => setSyncStatus("idle"), 2000);
+    }
+  };
+
+  // Export fonksiyonu
+  const handleExport = async () => {
+    try {
+      const data = await ProgressTracker.exportProgress();
+      const blob = new Blob([data], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `language-learning-backup-${
+        new Date().toISOString().split("T")[0]
+      }.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Export hatası:", error);
+    }
+  };
+
+  // Import fonksiyonu
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const success = await ProgressTracker.importProgress(text);
+      if (success) {
+        const data = ProgressTracker.getYearlyProgress();
+        const statsData = ProgressTracker.getOverallStats();
+        setProgressData(data);
+        setStats(statsData);
+        alert("✅ Veriler başarıyla yüklendi!");
+      } else {
+        alert("❌ Import başarısız. Dosya formatı geçerli değil.");
+      }
+    } catch (error) {
+      console.error("Import hatası:", error);
+      alert("❌ Import hatası: " + error);
+    }
+    // Input'u temizle
+    event.target.value = "";
+  };
 
   if (!mounted) {
     return (
@@ -55,15 +159,60 @@ const YearlyProgressChart = () => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-        365-Day Progress Map
-      </h2>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 md:mb-0">
+          365-Day Progress Map
+        </h2>
+
+        {/* Cloud Sync & Data Management Controls */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <button
+            onClick={handleCloudSync}
+            disabled={syncStatus === "syncing"}
+            className={`px-3 py-1 rounded text-sm font-medium ${
+              syncStatus === "syncing"
+                ? "bg-blue-100 text-blue-600 cursor-not-allowed"
+                : syncStatus === "success"
+                ? "bg-green-100 text-green-600"
+                : syncStatus === "error"
+                ? "bg-red-100 text-red-600"
+                : "bg-blue-500 text-white hover:bg-blue-600"
+            }`}
+          >
+            {syncStatus === "syncing"
+              ? "Syncing..."
+              : syncStatus === "success"
+              ? "✅ Synced"
+              : syncStatus === "error"
+              ? "❌ Error"
+              : "☁️ Sync"}
+          </button>
+
+          <button
+            onClick={handleExport}
+            className="px-3 py-1 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600"
+          >
+            📥 Export
+          </button>
+
+          <label className="px-3 py-1 bg-orange-500 text-white rounded text-sm font-medium hover:bg-orange-600 cursor-pointer">
+            📤 Import
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleImport}
+              className="hidden"
+            />
+          </label>
+        </div>
+      </div>
+
       <div className="text-gray-600 dark:text-gray-300 mb-6">
         GitHub contributions style daily activity tracking
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="text-center">
           <div className="text-lg font-bold text-gray-900 dark:text-white">
             {stats.completedDays || 0}
@@ -91,38 +240,158 @@ const YearlyProgressChart = () => {
       </div>
 
       {/* GitHub-style contributions chart */}
-      <div className="mb-4">
-        {/* Week numbers header */}
-        <div className="grid grid-cols-52 gap-1 mb-2">
-          {Array.from({ length: 52 }, (_, weekIndex) => (
-            <div key={weekIndex} className="text-center">
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {weekIndex + 1}
-              </span>
-            </div>
-          ))}
+      <div className="mb-4 overflow-x-auto">
+        {/* Desktop view */}
+        <div className="hidden md:block min-w-full">
+          {/* Week numbers header */}
+          <div className="grid grid-cols-52 gap-1 mb-2 min-w-[800px]">
+            {Array.from({ length: 52 }, (_, weekIndex) => (
+              <div key={weekIndex} className="text-center">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {weekIndex + 1}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Progress squares grouped by weeks */}
+          <div className="grid grid-cols-52 gap-1 min-w-[800px]">
+            {Array.from({ length: 52 }, (_, weekIndex) => (
+              <div
+                key={weekIndex}
+                className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1"
+              >
+                {progressData
+                  .filter((day) => day.weekNumber === weekIndex + 1)
+                  .map((day, dayIndex) => (
+                    <div
+                      key={dayIndex}
+                      className={`w-2 h-2 rounded-sm ${ProgressTracker.getCompletionColor(
+                        day.completionPercentage
+                      )} hover:scale-125 transition-all cursor-pointer mx-auto`}
+                      title={`Week ${day.weekNumber}, Day ${day.dayNumber}: ${day.completionPercentage}%`}
+                    />
+                  ))}
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Progress squares grouped by weeks */}
-        <div className="grid grid-cols-52 gap-1">
-          {Array.from({ length: 52 }, (_, weekIndex) => (
-            <div
-              key={weekIndex}
-              className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1"
-            >
-              {progressData
-                .filter((day) => day.weekNumber === weekIndex + 1)
-                .map((day, dayIndex) => (
-                  <div
-                    key={dayIndex}
-                    className={`w-2 h-2 rounded-sm ${ProgressTracker.getCompletionColor(
-                      day.completionPercentage
-                    )} hover:scale-125 transition-all cursor-pointer mx-auto`}
-                    title={`Hafta ${day.weekNumber}, Gün ${day.dayNumber}: ${day.completionPercentage}%`}
-                  />
+        {/* Mobile view - Quarterly breakdown */}
+        <div className="md:hidden">
+          <div className="space-y-6">
+            {/* Quarter 1 */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                Q1 (Weeks 1-13)
+              </h4>
+              <div className="grid grid-cols-13 gap-1">
+                {Array.from({ length: 13 }, (_, weekIndex) => (
+                  <div key={weekIndex} className="text-center">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      {weekIndex + 1}
+                    </div>
+                    <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1">
+                      {progressData
+                        .filter((day) => day.weekNumber === weekIndex + 1)
+                        .map((day, dayIndex) => (
+                          <div
+                            key={dayIndex}
+                            className={`w-1.5 h-1.5 rounded-sm ${ProgressTracker.getCompletionColor(
+                              day.completionPercentage
+                            )} mx-auto`}
+                          />
+                        ))}
+                    </div>
+                  </div>
                 ))}
+              </div>
             </div>
-          ))}
+
+            {/* Quarter 2 */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                Q2 (Weeks 14-26)
+              </h4>
+              <div className="grid grid-cols-13 gap-1">
+                {Array.from({ length: 13 }, (_, weekIndex) => (
+                  <div key={weekIndex + 13} className="text-center">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      {weekIndex + 14}
+                    </div>
+                    <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1">
+                      {progressData
+                        .filter((day) => day.weekNumber === weekIndex + 14)
+                        .map((day, dayIndex) => (
+                          <div
+                            key={dayIndex}
+                            className={`w-1.5 h-1.5 rounded-sm ${ProgressTracker.getCompletionColor(
+                              day.completionPercentage
+                            )} mx-auto`}
+                          />
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Quarter 3 */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                Q3 (Weeks 27-39)
+              </h4>
+              <div className="grid grid-cols-13 gap-1">
+                {Array.from({ length: 13 }, (_, weekIndex) => (
+                  <div key={weekIndex + 26} className="text-center">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      {weekIndex + 27}
+                    </div>
+                    <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1">
+                      {progressData
+                        .filter((day) => day.weekNumber === weekIndex + 27)
+                        .map((day, dayIndex) => (
+                          <div
+                            key={dayIndex}
+                            className={`w-1.5 h-1.5 rounded-sm ${ProgressTracker.getCompletionColor(
+                              day.completionPercentage
+                            )} mx-auto`}
+                          />
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Quarter 4 */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                Q4 (Weeks 40-52)
+              </h4>
+              <div className="grid grid-cols-13 gap-1">
+                {Array.from({ length: 13 }, (_, weekIndex) => (
+                  <div key={weekIndex + 39} className="text-center">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      {weekIndex + 40}
+                    </div>
+                    <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-1 flex flex-col gap-1">
+                      {progressData
+                        .filter((day) => day.weekNumber === weekIndex + 40)
+                        .map((day, dayIndex) => (
+                          <div
+                            key={dayIndex}
+                            className={`w-1.5 h-1.5 rounded-sm ${ProgressTracker.getCompletionColor(
+                              day.completionPercentage
+                            )} mx-auto`}
+                          />
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -130,11 +399,11 @@ const YearlyProgressChart = () => {
       <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <span>Less</span>
         <div className="flex gap-1">
-          <div className="w-3 h-3 rounded-sm bg-gray-100 dark:bg-gray-800"></div>
-          <div className="w-3 h-3 rounded-sm bg-green-100 dark:bg-green-900"></div>
-          <div className="w-3 h-3 rounded-sm bg-green-200 dark:bg-green-800"></div>
-          <div className="w-3 h-3 rounded-sm bg-green-300 dark:bg-green-700"></div>
-          <div className="w-3 h-3 rounded-sm bg-green-400 dark:bg-green-600"></div>
+          <div className="w-3 h-3 rounded-sm bg-gray-100 dark:bg-green-800"></div>
+          <div className="w-3 h-3 rounded-sm bg-green-100 dark:bg-green-700"></div>
+          <div className="w-3 h-3 rounded-sm bg-green-200 dark:bg-green-600"></div>
+          <div className="w-3 h-3 rounded-sm bg-green-300 dark:bg-green-500"></div>
+          <div className="w-3 h-3 rounded-sm bg-green-400 dark:bg-green-400"></div>
         </div>
         <span>More</span>
       </div>
@@ -144,10 +413,20 @@ const YearlyProgressChart = () => {
 
 export default function LanguageLearning() {
   const [selectedPhase, setSelectedPhase] = useState<string>("all");
-  const [overallStats, setOverallStats] = useState<any>({});
+  const [overallStats, setOverallStats] = useState<Stats>({
+    completedDays: 0,
+    partialDays: 0,
+    uncompletedDays: 0,
+    overallPercentage: 0,
+    currentStreak: 0,
+  });
   const [currentWeek, setCurrentWeek] = useState(1);
   const [mounted, setMounted] = useState(false);
-  const [vocabularyProgress, setVocabularyProgress] = useState<any>({});
+  const [vocabularyProgress, setVocabularyProgress] =
+    useState<VocabularyProgress>({
+      learned: 0,
+      confused: 0,
+    });
   const [showWordsModal, setShowWordsModal] = useState(false);
   const [modalType, setModalType] = useState<"learned" | "confused">("learned");
   const [modalWords, setModalWords] = useState<VocabularyCard[]>([]);
@@ -665,10 +944,6 @@ export default function LanguageLearning() {
     "C1-IELTS": "bg-purple-100 text-purple-800 border-purple-200",
     "C1-FINAL": "bg-red-100 text-red-800 border-red-200",
   };
-
-  // Progress calculations - from actual data
-  const completedWeeks = weeklyPlan.filter((week) => week.completed).length;
-  const totalWeeks = weeklyPlan.length;
 
   // Daily progress percentage
   const dailyProgressPercentage = overallStats.overallPercentage || 0;
@@ -1454,7 +1729,7 @@ export default function LanguageLearning() {
                     30-40 minutes
                   </div>
                   <div className="text-xs text-gray-600 dark:text-gray-300">
-                    Day's main topic
+                    Day&apos;s main topic
                   </div>
                 </div>
 
@@ -1508,7 +1783,7 @@ export default function LanguageLearning() {
                     5-10 minutes
                   </div>
                   <div className="text-xs text-gray-600 dark:text-gray-300">
-                    Day's notes
+                    Day&apos;s notes
                   </div>
                 </div>
               </div>
@@ -1527,7 +1802,9 @@ export default function LanguageLearning() {
                   📚 Grammar
                 </h3>
                 <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                  <li>• Raymond Murphy "English Grammar in Use" (B1-B2)</li>
+                  <li>
+                    • Raymond Murphy &quot;English Grammar in Use&quot; (B1-B2)
+                  </li>
                   <li>• Cambridge Grammar of English</li>
                   <li>• Practical English Usage</li>
                 </ul>
@@ -1590,6 +1867,85 @@ export default function LanguageLearning() {
                   <li>• EF SET Level Test</li>
                   <li>• IELTS Liz</li>
                 </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Firebase Setup Guide */}
+          <div className="max-w-6xl mx-auto mt-16">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center">
+              Multi-Platform Sync Setup
+            </h2>
+
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-8 border border-blue-200 dark:border-blue-700">
+              <h3 className="text-xl font-bold text-blue-800 dark:text-blue-300 mb-4">
+                ☁️ Cloud Sync ile Verileriniz Her Cihazda!
+              </h3>
+
+              <div className="space-y-4 text-gray-700 dark:text-gray-300">
+                <p>
+                  Verilerinizi kaybetmemek ve hem telefon hem PC&apos;den
+                  erişmek için:
+                </p>
+
+                <div className="grid md:grid-cols-2 gap-6 mt-6">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                    <h4 className="font-bold text-gray-900 dark:text-white mb-3">
+                      🔧 Quick Setup
+                    </h4>
+                    <ol className="list-decimal list-inside space-y-2 text-sm">
+                      <li>
+                        Go to{" "}
+                        <a
+                          href="https://console.firebase.google.com"
+                          className="text-blue-600 hover:underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Firebase Console
+                        </a>
+                      </li>
+                      <li>Create new project: &quot;language-learning&quot;</li>
+                      <li>Enable Firestore Database</li>
+                      <li>Add Web App, copy config</li>
+                      <li>Update .env.local file with config</li>
+                      <li>Click &quot;☁️ Sync&quot; button above</li>
+                    </ol>
+                  </div>
+
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                    <h4 className="font-bold text-gray-900 dark:text-white mb-3">
+                      💾 Backup Options
+                    </h4>
+                    <ul className="space-y-2 text-sm">
+                      <li>
+                        • <strong>📥 Export:</strong> Download JSON backup file
+                      </li>
+                      <li>
+                        • <strong>📤 Import:</strong> Restore from backup file
+                      </li>
+                      <li>
+                        • <strong>☁️ Sync:</strong> Auto-sync with Firebase
+                      </li>
+                      <li>
+                        • <strong>📱 Mobile:</strong> Same URL works on phone
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 mt-6">
+                  <h4 className="font-bold text-green-800 dark:text-green-300 mb-2">
+                    ✅ Benefits
+                  </h4>
+                  <ul className="space-y-1 text-sm text-green-700 dark:text-green-400">
+                    <li>• Real-time sync across all devices</li>
+                    <li>• Automatic backup to cloud</li>
+                    <li>• Access from phone browser</li>
+                    <li>• No data loss risk</li>
+                    <li>• Works offline, syncs when online</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
