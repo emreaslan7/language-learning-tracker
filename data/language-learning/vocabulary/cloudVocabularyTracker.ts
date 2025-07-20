@@ -20,6 +20,19 @@ interface UserWordData {
   examples?: string[];
 }
 
+// Firebase için temizlenmiş progress data
+interface CleanedWordProgress {
+  wordId: string;
+  learned: boolean;
+  confused: boolean;
+  reviewCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  lastReviewDate: string | null;
+  nextReviewDate: string | null;
+  difficulty: number;
+}
+
 export class CloudVocabularyTracker {
   private static COLLECTION_NAME = "vocabulary_data";
   private static PROGRESS_DOC = "main_vocabulary_progress"; // Sabit progress document ID
@@ -32,16 +45,20 @@ export class CloudVocabularyTracker {
     try {
       const docRef = doc(db, this.COLLECTION_NAME, this.PROGRESS_DOC);
 
-      // Firebase için undefined değerleri null'a çevir
+      // Firebase için undefined ve Date değerleri null'a çevir
       const cleanedProgress = Object.keys(progressData).reduce((acc, key) => {
         const item = progressData[key];
         acc[key] = {
           ...item,
-          lastReviewDate: item.lastReviewDate || null,
-          nextReviewDate: item.nextReviewDate || null,
+          lastReviewDate: item.lastReviewDate
+            ? item.lastReviewDate.toISOString()
+            : null,
+          nextReviewDate: item.nextReviewDate
+            ? item.nextReviewDate.toISOString()
+            : null,
         };
         return acc;
-      }, {} as { [key: string]: WordProgress });
+      }, {} as Record<string, CleanedWordProgress>);
 
       await setDoc(docRef, {
         progress: cleanedProgress,
@@ -88,8 +105,25 @@ export class CloudVocabularyTracker {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
+        const rawProgress = data.progress || {};
+
+        // String tarihlerini Date'e çevir
+        const convertedProgress: { [key: string]: WordProgress } = {};
+        Object.keys(rawProgress).forEach((wordId) => {
+          const item = rawProgress[wordId];
+          convertedProgress[wordId] = {
+            ...item,
+            lastReviewDate: item.lastReviewDate
+              ? new Date(item.lastReviewDate)
+              : new Date(),
+            nextReviewDate: item.nextReviewDate
+              ? new Date(item.nextReviewDate)
+              : new Date(),
+          };
+        });
+
         console.log("✅ Vocabulary progress Firebase'den yüklendi");
-        return data.progress || {};
+        return convertedProgress;
       } else {
         console.log("📝 Firebase'de vocabulary progress bulunamadı");
         return {};
@@ -318,57 +352,5 @@ export class CloudVocabularyTracker {
     });
 
     return merged;
-  }
-
-  // Progress auto sync (her değişiklikten sonra)
-  static async autoSyncProgress(wordProgress: WordProgress): Promise<void> {
-    try {
-      console.log(
-        "🔄 Vocabulary progress AutoSync başlatılıyor:",
-        wordProgress.wordId
-      );
-
-      // Önce localStorage'a kaydet
-      const currentDataStr = localStorage.getItem("vocabulary-progress");
-      const currentData = currentDataStr ? JSON.parse(currentDataStr) : {};
-
-      currentData[wordProgress.wordId] = wordProgress;
-      localStorage.setItem("vocabulary-progress", JSON.stringify(currentData));
-      console.log("💾 Vocabulary progress localStorage güncellendi");
-
-      // Firebase'e hemen kaydet
-      console.log("☁️ Vocabulary progress Firebase sync başlatılıyor...");
-      await this.saveProgressToCloud(currentData);
-      console.log("✅ Vocabulary progress AutoSync tamamlandı");
-    } catch (error) {
-      console.error("❌ Vocabulary progress Auto sync hatası:", error);
-      throw error;
-    }
-  }
-
-  // User data auto sync (her değişiklikten sonra)
-  static async autoSyncUserData(
-    wordId: string,
-    userData: UserWordData
-  ): Promise<void> {
-    try {
-      console.log("🔄 User data AutoSync başlatılıyor:", wordId);
-
-      // Önce localStorage'a kaydet
-      const currentDataStr = localStorage.getItem("vocabulary-user-data");
-      const currentData = currentDataStr ? JSON.parse(currentDataStr) : {};
-
-      currentData[wordId] = userData;
-      localStorage.setItem("vocabulary-user-data", JSON.stringify(currentData));
-      console.log("💾 User data localStorage güncellendi");
-
-      // Firebase'e hemen kaydet
-      console.log("☁️ User data Firebase sync başlatılıyor...");
-      await this.saveUserDataToCloud(currentData);
-      console.log("✅ User data AutoSync tamamlandı");
-    } catch (error) {
-      console.error("❌ User data Auto sync hatası:", error);
-      throw error;
-    }
   }
 }
