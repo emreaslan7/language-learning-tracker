@@ -11,7 +11,7 @@ export interface TaskProgress {
   dayNumber: number;
   taskType: TaskType;
   completed: boolean;
-  completedAt?: Date;
+  completedAt?: Date | null;
 }
 
 export interface DayProgress {
@@ -163,7 +163,7 @@ export class ProgressTracker {
       dayNumber,
       taskType,
       completed: false,
-      completedAt: undefined,
+      completedAt: null,
     };
 
     if (existingIndex >= 0) {

@@ -11,8 +11,14 @@ export class CloudProgressTracker {
     try {
       const docRef = doc(db, this.COLLECTION_NAME, this.DOCUMENT_ID);
 
+      // Firebase için undefined değerleri null'a çevir
+      const cleanedProgress = progress.map((item) => ({
+        ...item,
+        completedAt: item.completedAt === undefined ? null : item.completedAt,
+      }));
+
       await setDoc(docRef, {
-        progress,
+        progress: cleanedProgress,
         lastUpdated: new Date(),
         version: 1,
       });
