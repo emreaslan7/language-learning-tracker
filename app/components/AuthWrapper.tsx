@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import PinAuth from './PinAuth';
+import { useState, useEffect } from "react";
+import PinAuth from "./PinAuth";
 
 interface AuthWrapperProps {
   children: React.ReactNode;
@@ -10,34 +10,34 @@ interface AuthWrapperProps {
 export default function AuthWrapper({ children }: AuthWrapperProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   useEffect(() => {
     // Check if user is already authenticated and session not expired
     const checkAuth = () => {
-      const expirationTime = localStorage.getItem('pinAuthExpiration');
-      
+      const expirationTime = localStorage.getItem("pinAuthExpiration");
+
       if (expirationTime) {
         const now = Date.now();
         const expiry = parseInt(expirationTime);
-        
+
         if (now < expiry) {
           setIsAuthenticated(true);
         } else {
           // Session expired, remove expired auth
-          localStorage.removeItem('pinAuthExpiration');
+          localStorage.removeItem("pinAuthExpiration");
         }
       }
-      
+
       setIsLoading(false);
     };
-    
+
     checkAuth();
   }, []);
-  
+
   const handleAuthenticated = () => {
     setIsAuthenticated(true);
   };
-  
+
   // Loading state
   if (isLoading) {
     return (
@@ -49,12 +49,12 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
       </div>
     );
   }
-  
+
   // Show PIN auth if not authenticated
   if (!isAuthenticated) {
     return <PinAuth onAuthenticated={handleAuthenticated} />;
   }
-  
+
   // Show main app if authenticated
   return <>{children}</>;
 }

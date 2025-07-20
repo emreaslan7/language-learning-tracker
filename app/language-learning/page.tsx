@@ -599,14 +599,14 @@ export default function LanguageLearning() {
       title: "B1 Foundations and Daily Routines",
       focus: "Present Simple & Continuous, basic daily vocabulary",
       phase: "B1-B2",
-      completed: true,
+      completed: false,
     },
     {
       week: 2,
       title: "Past Tenses and Travel",
       focus: "Past Simple & Continuous, travel vocabulary",
       phase: "B1-B2",
-      completed: true,
+      completed: false,
     },
     {
       week: 3,
