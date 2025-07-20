@@ -90,51 +90,6 @@ const YearlyProgressChart = () => {
     }
   };
 
-  // Export fonksiyonu
-  const handleExport = async () => {
-    try {
-      const data = await ProgressTracker.exportProgress();
-      const blob = new Blob([data], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `language-learning-backup-${
-        new Date().toISOString().split("T")[0]
-      }.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Export hatası:", error);
-    }
-  };
-
-  // Import fonksiyonu
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const success = await ProgressTracker.importProgress(text);
-      if (success) {
-        const data = ProgressTracker.getYearlyProgress();
-        const statsData = ProgressTracker.getOverallStats();
-        setProgressData(data);
-        setStats(statsData);
-        alert("✅ Veriler başarıyla yüklendi!");
-      } else {
-        alert("❌ Import başarısız. Dosya formatı geçerli değil.");
-      }
-    } catch (error) {
-      console.error("Import hatası:", error);
-      alert("❌ Import hatası: " + error);
-    }
-    // Input'u temizle
-    event.target.value = "";
-  };
-
   if (!mounted) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
@@ -164,12 +119,12 @@ const YearlyProgressChart = () => {
           365-Day Progress Map
         </h2>
 
-        {/* Cloud Sync & Data Management Controls */}
-        <div className="flex flex-wrap gap-2 items-center">
+        {/* Cloud Sync Control */}
+        <div className="flex items-center">
           <button
             onClick={handleCloudSync}
             disabled={syncStatus === "syncing"}
-            className={`px-3 py-1 rounded text-sm font-medium ${
+            className={`px-4 py-2 rounded text-sm font-medium ${
               syncStatus === "syncing"
                 ? "bg-blue-100 text-blue-600 cursor-not-allowed"
                 : syncStatus === "success"
@@ -185,25 +140,8 @@ const YearlyProgressChart = () => {
               ? "✅ Synced"
               : syncStatus === "error"
               ? "❌ Error"
-              : "☁️ Sync"}
+              : "☁️ Cloud Sync"}
           </button>
-
-          <button
-            onClick={handleExport}
-            className="px-3 py-1 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600"
-          >
-            📥 Export
-          </button>
-
-          <label className="px-3 py-1 bg-orange-500 text-white rounded text-sm font-medium hover:bg-orange-600 cursor-pointer">
-            📤 Import
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleImport}
-              className="hidden"
-            />
-          </label>
         </div>
       </div>
 
@@ -1871,81 +1809,48 @@ export default function LanguageLearning() {
             </div>
           </div>
 
-          {/* Firebase Setup Guide */}
+          {/* Multi-Platform Access Info */}
           <div className="max-w-6xl mx-auto mt-16">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center">
-              Multi-Platform Sync Setup
-            </h2>
-
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-8 border border-blue-200 dark:border-blue-700">
-              <h3 className="text-xl font-bold text-blue-800 dark:text-blue-300 mb-4">
-                ☁️ Cloud Sync ile Verileriniz Her Cihazda!
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-8 border border-green-200 dark:border-green-700">
+              <h3 className="text-xl font-bold text-green-800 dark:text-green-300 mb-4">
+                📱💻 Multi-Platform Access Active!
               </h3>
 
-              <div className="space-y-4 text-gray-700 dark:text-gray-300">
-                <p>
-                  Verilerinizi kaybetmemek ve hem telefon hem PC&apos;den
-                  erişmek için:
-                </p>
-
-                <div className="grid md:grid-cols-2 gap-6 mt-6">
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                    <h4 className="font-bold text-gray-900 dark:text-white mb-3">
-                      🔧 Quick Setup
-                    </h4>
-                    <ol className="list-decimal list-inside space-y-2 text-sm">
-                      <li>
-                        Go to{" "}
-                        <a
-                          href="https://console.firebase.google.com"
-                          className="text-blue-600 hover:underline"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Firebase Console
-                        </a>
-                      </li>
-                      <li>Create new project: &quot;language-learning&quot;</li>
-                      <li>Enable Firestore Database</li>
-                      <li>Add Web App, copy config</li>
-                      <li>Update .env.local file with config</li>
-                      <li>Click &quot;☁️ Sync&quot; button above</li>
-                    </ol>
-                  </div>
-
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                    <h4 className="font-bold text-gray-900 dark:text-white mb-3">
-                      💾 Backup Options
-                    </h4>
-                    <ul className="space-y-2 text-sm">
-                      <li>
-                        • <strong>📥 Export:</strong> Download JSON backup file
-                      </li>
-                      <li>
-                        • <strong>📤 Import:</strong> Restore from backup file
-                      </li>
-                      <li>
-                        • <strong>☁️ Sync:</strong> Auto-sync with Firebase
-                      </li>
-                      <li>
-                        • <strong>📱 Mobile:</strong> Same URL works on phone
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 mt-6">
-                  <h4 className="font-bold text-green-800 dark:text-green-300 mb-2">
-                    ✅ Benefits
-                  </h4>
-                  <ul className="space-y-1 text-sm text-green-700 dark:text-green-400">
-                    <li>• Real-time sync across all devices</li>
-                    <li>• Automatic backup to cloud</li>
-                    <li>• Access from phone browser</li>
-                    <li>• No data loss risk</li>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-3 text-green-700 dark:text-green-400">
+                  <h4 className="font-bold">✅ What&apos;s Working:</h4>
+                  <ul className="space-y-1 text-sm">
+                    <li>• Real-time cloud sync with Firebase</li>
+                    <li>• Access from any device with this URL</li>
+                    <li>• Automatic data backup</li>
+                    <li>• Progress syncs across devices</li>
                     <li>• Works offline, syncs when online</li>
                   </ul>
                 </div>
+
+                <div className="space-y-3 text-green-700 dark:text-green-400">
+                  <h4 className="font-bold">🚀 URL Access:</h4>
+                  <div className="bg-white dark:bg-gray-800 rounded p-3">
+                    <p className="text-sm font-mono text-gray-600 dark:text-gray-300">
+                      https://language-learning-trracker.vercel.app
+                    </p>
+                  </div>
+                  <p className="text-xs">
+                    Bookmark this URL on all your devices (phone, tablet, PC)
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2">
+                  💡 How to Use:
+                </h4>
+                <ol className="space-y-1 text-sm text-blue-700 dark:text-blue-400">
+                  <li>1. Open URL on any device</li>
+                  <li>2. Mark tasks as complete using checkboxes</li>
+                  <li>3. Click &quot;☁️ Cloud Sync&quot; to save to cloud</li>
+                  <li>4. Changes appear on all your devices!</li>
+                </ol>
               </div>
             </div>
           </div>

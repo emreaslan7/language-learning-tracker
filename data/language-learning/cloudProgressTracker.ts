@@ -1,18 +1,13 @@
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { auth, db } from "../../lib/firebase";
+import { db } from "../../lib/firebase";
 import { TaskProgress } from "./progressTracker";
 
 export class CloudProgressTracker {
   private static COLLECTION_NAME = "progress_data";
 
-  // User ID al (auth yoksa localStorage'dan unique ID)
+  // User ID al (localStorage'dan unique ID)
   private static getUserId(): string {
-    const user = auth.currentUser;
-    if (user) {
-      return user.uid;
-    }
-
-    // Auth yoksa localStorage'dan unique ID al veya oluştur
+    // localStorage'dan unique ID al veya oluştur
     let userId = localStorage.getItem("unique_user_id");
     if (!userId) {
       userId =
