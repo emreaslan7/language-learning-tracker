@@ -63,15 +63,23 @@ const YearlyProgressChart = () => {
     refreshProgressData();
 
     const loadData = async () => {
-      // Cloud sync'i başlat
+      // Cloud sync'i başlat (main progress)
       try {
         await ProgressTracker.initCloudSync();
-        console.log("✅ Cloud sync başlatıldı");
+        console.log("✅ Main progress cloud sync başlatıldı");
 
         // Cloud sync'ten sonra verileri yeniden yükle
         refreshProgressData();
       } catch (error) {
-        console.warn("⚠️ Cloud sync başlatılamadı:", error);
+        console.warn("⚠️ Main progress cloud sync başlatılamadı:", error);
+      }
+
+      // Vocabulary cloud sync'i başlat
+      try {
+        await VocabularyManager.initializeVocabulary();
+        console.log("✅ Vocabulary cloud sync başlatıldı");
+      } catch (error) {
+        console.warn("⚠️ Vocabulary cloud sync başlatılamadı:", error);
       }
     };
 
