@@ -1,23 +1,16 @@
 import { ProgressTracker } from "../data/language-learning/progressTracker";
+import { db } from "../lib/firebase";
 
 // Firebase test component'i
 export const FirebaseTest = () => {
   const testFirebase = async () => {
     console.log("🔥 Firebase Test Başlatılıyor...");
 
-    // Environment variables kontrolü
-    console.log("📝 Env Variables:");
+    // Firebase config kontrolü
+    console.log("📝 Firebase Config:");
     console.log(
-      "API_KEY:",
-      process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? "✅ Var" : "❌ Yok"
-    );
-    console.log(
-      "PROJECT_ID:",
-      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ? "✅ Var" : "❌ Yok"
-    );
-    console.log(
-      "AUTH_DOMAIN:",
-      process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ? "✅ Var" : "❌ Yok"
+      "Database instance:",
+      db ? "✅ Firebase DB mevcut" : "❌ Firebase DB yok"
     );
 
     try {
