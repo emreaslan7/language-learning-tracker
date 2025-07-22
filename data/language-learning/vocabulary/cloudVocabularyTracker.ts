@@ -66,7 +66,11 @@ export class CloudVocabularyTracker {
         version: 1,
       });
 
-      console.log("✅ Vocabulary progress Firebase'e kaydedildi");
+      console.log(
+        `✅ Vocabulary progress Firebase'e kaydedildi (${
+          Object.keys(progressData).length
+        } kelime)`
+      );
       return true;
     } catch (error) {
       console.error("❌ Firebase vocabulary progress kayıt hatası:", error);
@@ -87,7 +91,11 @@ export class CloudVocabularyTracker {
         version: 1,
       });
 
-      console.log("✅ Vocabulary user data Firebase'e kaydedildi");
+      console.log(
+        `✅ Vocabulary user data Firebase'e kaydedildi (${
+          Object.keys(userData).length
+        } kelime)`
+      );
       return true;
     } catch (error) {
       console.error("❌ Firebase vocabulary user data kayıt hatası:", error);

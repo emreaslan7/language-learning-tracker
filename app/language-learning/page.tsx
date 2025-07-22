@@ -1270,6 +1270,27 @@ export default function LanguageLearning() {
               Detailed, week-by-week planned English learning journey. The path
               from B1 level to C1 level and IELTS success.
             </div>
+
+            {/* Debug Vocabulary Sync Button */}
+            <div className="mt-6">
+              <button
+                onClick={async () => {
+                  console.log("🔧 Manuel vocabulary sync başlatılıyor...");
+                  try {
+                    await VocabularyManager.forceUploadToFirebase();
+                    alert(
+                      "Vocabulary data Firebase'e gönderildi! Console'u kontrol edin."
+                    );
+                  } catch (error) {
+                    console.error("Sync hatası:", error);
+                    alert("Sync hatası! Console'u kontrol edin.");
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              >
+                🔧 Debug: Vocabulary Sync to Firebase
+              </button>
+            </div>
           </div>
 
           {/* Progress Overview */}

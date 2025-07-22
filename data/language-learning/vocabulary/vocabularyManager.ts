@@ -124,6 +124,8 @@ export class VocabularyManager {
       return;
     }
 
+    console.log(`📚 Kelime öğrenildi olarak işaretleniyor: ${wordId}`);
+
     const progressData = this.getStoredProgress();
     const currentProgress = progressData[wordId] || {
       wordId,
@@ -142,11 +144,18 @@ export class VocabularyManager {
       learned: true,
       confused: false, // Clear confused when marked as learned
       correctCount: currentProgress.correctCount + 1,
+      reviewCount: currentProgress.reviewCount + 1,
       lastReviewDate: new Date(),
       nextReviewDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // Next day
     };
 
     progressData[wordId] = updatedProgress;
+
+    console.log(
+      `💾 Progress data güncellendi, toplam kelime sayısı: ${
+        Object.keys(progressData).length
+      }`
+    );
     await this.saveProgress(progressData);
   }
 
@@ -155,6 +164,8 @@ export class VocabularyManager {
     if (typeof window === "undefined") {
       return;
     }
+
+    console.log(`❓ Kelime karıştırıldı olarak işaretleniyor: ${wordId}`);
 
     const progressData = this.getStoredProgress();
     const currentProgress = progressData[wordId] || {
@@ -174,11 +185,18 @@ export class VocabularyManager {
       confused: true,
       learned: false, // Clear learned when marked as confused
       incorrectCount: currentProgress.incorrectCount + 1,
+      reviewCount: currentProgress.reviewCount + 1,
       lastReviewDate: new Date(),
       nextReviewDate: new Date(Date.now() + 12 * 60 * 60 * 1000), // 12 hours later
     };
 
     progressData[wordId] = updatedProgress;
+
+    console.log(
+      `💾 Progress data güncellendi, toplam kelime sayısı: ${
+        Object.keys(progressData).length
+      }`
+    );
     await this.saveProgress(progressData);
   }
 
@@ -187,6 +205,8 @@ export class VocabularyManager {
     if (typeof window === "undefined") {
       return;
     }
+
+    console.log(`🔄 Kelime durumu sıfırlanıyor: ${wordId}`);
 
     const progressData = this.getStoredProgress();
     const currentProgress = progressData[wordId] || {
@@ -206,9 +226,16 @@ export class VocabularyManager {
       learned: false,
       confused: false,
       lastReviewDate: new Date(),
+      nextReviewDate: new Date(),
     };
 
     progressData[wordId] = updatedProgress;
+
+    console.log(
+      `💾 Progress data güncellendi, toplam kelime sayısı: ${
+        Object.keys(progressData).length
+      }`
+    );
     await this.saveProgress(progressData);
   }
 
@@ -238,12 +265,26 @@ export class VocabularyManager {
     try {
       // Önce localStorage'a kaydet
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(progressData));
-      console.log("💾 Vocabulary progress localStorage güncellendi");
+      console.log(
+        `💾 Vocabulary progress localStorage güncellendi (${
+          Object.keys(progressData).length
+        } kelime)`
+      );
 
       // Hemen Firebase'e sync et
       try {
-        await CloudVocabularyTracker.saveProgressToCloud(progressData);
-        console.log("☁️ Vocabulary progress Firebase sync tamamlandı");
+        const success = await CloudVocabularyTracker.saveProgressToCloud(
+          progressData
+        );
+        if (success) {
+          console.log(
+            `☁️ Vocabulary progress Firebase sync tamamlandı (${
+              Object.keys(progressData).length
+            } kelime)`
+          );
+        } else {
+          console.warn("⚠️ Vocabulary progress Firebase sync başarısız oldu");
+        }
 
         // UI'ı güncelle
         if (typeof window !== "undefined") {
@@ -364,12 +405,26 @@ export class VocabularyManager {
     try {
       // Önce localStorage'a kaydet
       localStorage.setItem(this.USER_DATA_KEY, JSON.stringify(userData));
-      console.log("💾 Vocabulary user data localStorage güncellendi");
+      console.log(
+        `💾 Vocabulary user data localStorage güncellendi (${
+          Object.keys(userData).length
+        } kelime)`
+      );
 
       // Hemen Firebase'e sync et
       try {
-        await CloudVocabularyTracker.saveUserDataToCloud(userData);
-        console.log("☁️ Vocabulary user data Firebase sync tamamlandı");
+        const success = await CloudVocabularyTracker.saveUserDataToCloud(
+          userData
+        );
+        if (success) {
+          console.log(
+            `☁️ Vocabulary user data Firebase sync tamamlandı (${
+              Object.keys(userData).length
+            } kelime)`
+          );
+        } else {
+          console.warn("⚠️ Vocabulary user data Firebase sync başarısız oldu");
+        }
 
         // UI'ı güncelle
         if (typeof window !== "undefined") {
@@ -444,7 +499,32 @@ export class VocabularyManager {
 
     try {
       console.log("🔄 Vocabulary: Tüm veri sync başlatılıyor...");
+
+      // Önce localStorage'daki güncel verileri Firebase'e gönder
+      const progressData = this.getStoredProgress();
+      const userData = this.getUserData();
+
+      if (Object.keys(progressData).length > 0) {
+        console.log(
+          `📤 ${
+            Object.keys(progressData).length
+          } kelime progress data Firebase'e gönderiliyor...`
+        );
+        await CloudVocabularyTracker.saveProgressToCloud(progressData);
+      }
+
+      if (Object.keys(userData).length > 0) {
+        console.log(
+          `📤 ${
+            Object.keys(userData).length
+          } kelime user data Firebase'e gönderiliyor...`
+        );
+        await CloudVocabularyTracker.saveUserDataToCloud(userData);
+      }
+
+      // Sonra cloud sync'i de çalıştır (çift yönlü sync)
       await CloudVocabularyTracker.syncAllVocabularyData();
+
       console.log("✅ Vocabulary: Tüm veri sync tamamlandı");
     } catch (error) {
       console.error("❌ Vocabulary: Sync hatası:", error);
@@ -491,9 +571,89 @@ export class VocabularyManager {
       // Her iki veri türünü de sync et
       await Promise.all([this.syncProgressData(), this.syncUserData()]);
 
+      // Auto-sync'i başlat (her 30 saniyede bir kontrol et)
+      this.startAutoSync();
+
       console.log("✅ Vocabulary sistem başlatıldı");
     } catch (error) {
       console.error("❌ Vocabulary sistem başlatma hatası:", error);
+    }
+  }
+
+  // Auto-sync functionality - her 30 saniyede bir kontrol et
+  private static startAutoSync(): void {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    setInterval(async () => {
+      try {
+        const progressData = this.getStoredProgress();
+        const userData = this.getUserData();
+
+        // Eğer localStorage'da veri varsa ve son sync'ten beri değişiklik olduysa
+        if (Object.keys(progressData).length > 0) {
+          console.log("🔄 Auto-sync: Progress data kontrol ediliyor...");
+          await CloudVocabularyTracker.saveProgressToCloud(progressData);
+        }
+
+        if (Object.keys(userData).length > 0) {
+          console.log("🔄 Auto-sync: User data kontrol ediliyor...");
+          await CloudVocabularyTracker.saveUserDataToCloud(userData);
+        }
+      } catch (error) {
+        console.log(
+          "⚠️ Auto-sync hatası (normal, internet bağlantısı olabilir):",
+          error
+        );
+      }
+    }, 30000); // 30 saniye
+  }
+
+  // Manuel olarak tüm localStorage verilerini Firebase'e zorla gönder
+  static async forceUploadToFirebase(): Promise<void> {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      console.log("🚀 Manuel Firebase upload başlatılıyor...");
+
+      const progressData = this.getStoredProgress();
+      const userData = this.getUserData();
+
+      console.log(
+        `📊 Local Progress Data: ${Object.keys(progressData).length} kelime`
+      );
+      console.log(`📊 Local User Data: ${Object.keys(userData).length} kelime`);
+
+      if (Object.keys(progressData).length > 0) {
+        console.log("📤 Progress data Firebase'e gönderiliyor...");
+        const success1 = await CloudVocabularyTracker.saveProgressToCloud(
+          progressData
+        );
+        if (success1) {
+          console.log("✅ Progress data başarıyla Firebase'e gönderildi");
+        } else {
+          console.error("❌ Progress data Firebase'e gönderilemedi");
+        }
+      }
+
+      if (Object.keys(userData).length > 0) {
+        console.log("📤 User data Firebase'e gönderiliyor...");
+        const success2 = await CloudVocabularyTracker.saveUserDataToCloud(
+          userData
+        );
+        if (success2) {
+          console.log("✅ User data başarıyla Firebase'e gönderildi");
+        } else {
+          console.error("❌ User data Firebase'e gönderilemedi");
+        }
+      }
+
+      console.log("🎉 Manuel Firebase upload tamamlandı!");
+    } catch (error) {
+      console.error("❌ Manuel Firebase upload hatası:", error);
     }
   }
 } // Export vocabulary cards for compatibility

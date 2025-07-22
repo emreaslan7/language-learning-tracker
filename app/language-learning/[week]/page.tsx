@@ -2,14 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { getWeekData } from "../../../data/language-learning";
-import { DayActivity } from "../../../data/language-learning/types";
-import { ProgressTracker } from "../../../data/language-learning/progressTracker";
+import {
+  ProgressTracker,
+  TaskType,
+} from "../../../data/language-learning/progressTracker";
 import {
   VocabularyManager,
   vocabularyStats,
 } from "../../../data/language-learning/vocabulary";
+import { VocabularyCard } from "../../../data/language-learning/vocabulary/types";
 
 // Daily Vocabulary Card Component
 const DailyVocabularyCard = ({
@@ -21,10 +24,9 @@ const DailyVocabularyCard = ({
   dayNumber: number;
   onWordsLearned: (count: number) => void;
 }) => {
-  const [dailyWords, setDailyWords] = useState<any[]>([]);
+  const [dailyWords, setDailyWords] = useState<VocabularyCard[]>([]);
   const [wordsLearned, setWordsLearned] = useState(0);
-  const [isStudying, setIsStudying] = useState(false);
-  const [selectedWord, setSelectedWord] = useState<any>(null);
+  const [selectedWord, setSelectedWord] = useState<VocabularyCard | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCardFlipped, setIsCardFlipped] = useState(false);
   const [editableDefinition, setEditableDefinition] = useState("");
@@ -46,27 +48,63 @@ const DailyVocabularyCard = ({
     setDailyWords(dayWords);
 
     // Check how many words are already learned
-    const learned = dayWords.filter((word: any) => word.learned).length;
+    const learned = dayWords.filter(
+      (word: VocabularyCard) => word.learned
+    ).length;
     setWordsLearned(learned);
 
     // Call onWordsLearned only when the component mounts or when weekNumber/dayNumber changes
     onWordsLearned(learned);
-  }, [weekNumber, dayNumber, isClient]); // Add isClient to dependencies
+  }, [weekNumber, dayNumber, isClient, onWordsLearned]); // Add isClient to dependencies
+
+  // Listen for vocabulary progress changes to refresh UI
+  useEffect(() => {
+    if (!isClient) return;
+
+    const handleVocabularyChange = () => {
+      // Refresh the daily words data
+      const dayWords = VocabularyManager.getWeekDayWords(weekNumber, dayNumber);
+      setDailyWords(dayWords);
+
+      // Update learned count
+      const learned = dayWords.filter(
+        (word: VocabularyCard) => word.learned
+      ).length;
+      setWordsLearned(learned);
+      onWordsLearned(learned);
+    };
+
+    // Listen for vocabulary progress changes
+    window.addEventListener(
+      "vocabularyProgressChanged",
+      handleVocabularyChange
+    );
+    window.addEventListener(
+      "vocabularyUserDataChanged",
+      handleVocabularyChange
+    );
+
+    // Cleanup
+    return () => {
+      window.removeEventListener(
+        "vocabularyProgressChanged",
+        handleVocabularyChange
+      );
+      window.removeEventListener(
+        "vocabularyUserDataChanged",
+        handleVocabularyChange
+      );
+    };
+  }, [weekNumber, dayNumber, isClient, onWordsLearned]);
 
   const handleStartStudy = () => {
-    setIsStudying(true);
     // Redirect to vocabulary study page
     window.location.href = "/language-learning/vocabulary-study";
   };
 
-  const handleWordLearned = (wordId: string) => {
-    VocabularyManager.markAsLearned(wordId);
-    const newCount = wordsLearned + 1;
-    setWordsLearned(newCount);
-    onWordsLearned(newCount);
-  };
+  // Word learned handler removed - now handled in handleLearningStatus
 
-  const handleWordClick = (word: any) => {
+  const handleWordClick = (word: VocabularyCard) => {
     if (!isClient) return;
 
     setSelectedWord(word);
@@ -116,54 +154,75 @@ const DailyVocabularyCard = ({
     setEditableExamples(newExamples);
   };
 
-  const handleSaveUserData = () => {
+  const handleSaveUserData = async () => {
     if (!isClient || !selectedWord) return;
 
-    VocabularyManager.saveUserData(selectedWord.id, {
-      definition: editableDefinition,
-      examples: editableExamples,
-    });
-    // Show a brief success message or indication
-    alert("Definition and examples saved successfully!");
+    try {
+      await VocabularyManager.saveUserData(selectedWord.id, {
+        definition: editableDefinition,
+        examples: editableExamples.filter((example) => example.trim() !== ""), // Boş örnekleri filtrele
+      });
+      // Show a brief success message or indication
+      alert("Definition and examples saved successfully!");
+    } catch (error) {
+      console.error("Error saving user data:", error);
+      alert("Error saving data. Please try again.");
+    }
   };
 
-  const handleLearningStatus = (
+  const handleLearningStatus = async (
     status: "not-learned" | "confused" | "learned"
   ) => {
-    if (status === "learned") {
-      VocabularyManager.markAsLearned(selectedWord.id);
-      const newCount = wordsLearned + 1;
-      setWordsLearned(newCount);
-      onWordsLearned(newCount);
+    if (!selectedWord) return;
 
-      // Update the word in the daily words array
-      setDailyWords((prevWords) =>
-        prevWords.map((word) =>
-          word.id === selectedWord.id
-            ? { ...word, learned: true, confused: false }
-            : word
-        )
-      );
-    } else if (status === "confused") {
-      VocabularyManager.markAsIncorrect(selectedWord.id);
+    try {
+      if (status === "learned") {
+        await VocabularyManager.markAsLearned(selectedWord.id);
+        const newCount = wordsLearned + 1;
+        setWordsLearned(newCount);
+        onWordsLearned(newCount);
 
-      // Update the word in the daily words array
-      setDailyWords((prevWords) =>
-        prevWords.map((word) =>
-          word.id === selectedWord.id
-            ? { ...word, confused: true, learned: false }
-            : word
-        )
-      );
-    } else if (status === "not-learned") {
-      // Reset the word status
-      setDailyWords((prevWords) =>
-        prevWords.map((word) =>
-          word.id === selectedWord.id
-            ? { ...word, learned: false, confused: false }
-            : word
-        )
-      );
+        // Update the word in the daily words array
+        setDailyWords((prevWords) =>
+          prevWords.map((word) =>
+            word.id === selectedWord.id
+              ? { ...word, learned: true, confused: false }
+              : word
+          )
+        );
+      } else if (status === "confused") {
+        await VocabularyManager.markAsIncorrect(selectedWord.id);
+
+        // Update the word in the daily words array
+        setDailyWords((prevWords) =>
+          prevWords.map((word) =>
+            word.id === selectedWord.id
+              ? { ...word, confused: true, learned: false }
+              : word
+          )
+        );
+      } else if (status === "not-learned") {
+        await VocabularyManager.resetWordStatus(selectedWord.id);
+
+        // Eğer öğrenilmiş olarak işaretlenmiş bir kelimeyi sıfırlıyorsak, sayacı azalt
+        if (selectedWord.learned) {
+          const newCount = Math.max(0, wordsLearned - 1);
+          setWordsLearned(newCount);
+          onWordsLearned(newCount);
+        }
+
+        // Update the word in the daily words array
+        setDailyWords((prevWords) =>
+          prevWords.map((word) =>
+            word.id === selectedWord.id
+              ? { ...word, learned: false, confused: false }
+              : word
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error updating word status:", error);
+      alert("Error updating word status. Please try again.");
     }
 
     closeModal();
@@ -197,10 +256,10 @@ const DailyVocabularyCard = ({
         {dailyWords.length > 0 && (
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
             <h4 className="font-medium text-gray-900 dark:text-white mb-2">
-              Today's Words:
+              Today&apos;s Words:
             </h4>
             <div className="grid grid-cols-2 gap-2 text-sm">
-              {dailyWords.map((word, index) => (
+              {dailyWords.map((word) => (
                 <div
                   key={word.id}
                   className={`p-2 rounded cursor-pointer transition-colors hover:opacity-80 ${
@@ -437,16 +496,10 @@ const DailyVocabularyCard = ({
 
 // Task Completion Button Component
 const TaskCompletionButton = ({
-  weekNumber,
-  dayNumber,
-  taskType,
   taskName,
   isCompleted,
   onToggle,
 }: {
-  weekNumber: number;
-  dayNumber: number;
-  taskType: string;
   taskName: string;
   isCompleted: boolean;
   onToggle: () => void;
@@ -481,7 +534,6 @@ const TaskCompletionButton = ({
 
 export default function WeekDetail() {
   const params = useParams();
-  const router = useRouter();
   const [selectedDay, setSelectedDay] = useState(1);
   const [taskCompletions, setTaskCompletions] = useState<{
     [key: string]: boolean;
@@ -522,7 +574,7 @@ export default function WeekDetail() {
       const percentages: { [key: number]: number } = {};
 
       for (let day = 1; day <= 7; day++) {
-        const tasks = ["warmUp", "mainFocus", "practice", "review"];
+        const tasks: TaskType[] = ["warmUp", "mainFocus", "practice", "review"];
         // Writing günlerini kontrol et
         const writingDays = [1, 2, 4, 6];
         if (writingDays.includes(day)) {
@@ -553,7 +605,7 @@ export default function WeekDetail() {
   }, [weekNumber, isClient]);
 
   // Task completion toggle handler
-  const toggleTaskCompletion = (dayNumber: number, taskType: string) => {
+  const toggleTaskCompletion = (dayNumber: number, taskType: TaskType) => {
     const key = `${weekNumber}-${dayNumber}-${taskType}`;
     const currentStatus = taskCompletions[key];
 
@@ -731,9 +783,6 @@ export default function WeekDetail() {
                   <div className="space-y-3">
                     {/* Ana görevler */}
                     <TaskCompletionButton
-                      weekNumber={weekNumber}
-                      dayNumber={selectedDay}
-                      taskType="warmUp"
                       taskName="Previous Day Review"
                       isCompleted={
                         taskCompletions[
@@ -746,9 +795,6 @@ export default function WeekDetail() {
                     />
 
                     <TaskCompletionButton
-                      weekNumber={weekNumber}
-                      dayNumber={selectedDay}
-                      taskType="mainFocus"
                       taskName="Main Topic Study"
                       isCompleted={
                         taskCompletions[
@@ -770,9 +816,6 @@ export default function WeekDetail() {
                     />
 
                     <TaskCompletionButton
-                      weekNumber={weekNumber}
-                      dayNumber={selectedDay}
-                      taskType="practice"
                       taskName="AI English Practice"
                       isCompleted={
                         taskCompletions[
@@ -787,9 +830,6 @@ export default function WeekDetail() {
                     {/* Writing task (only on specific days) */}
                     {[1, 2, 4, 6].includes(selectedDay) && (
                       <TaskCompletionButton
-                        weekNumber={weekNumber}
-                        dayNumber={selectedDay}
-                        taskType="writing"
                         taskName={`Writing: ${
                           selectedDay === 1
                             ? "Comprehensive Essay"
@@ -807,9 +847,6 @@ export default function WeekDetail() {
                     )}
 
                     <TaskCompletionButton
-                      weekNumber={weekNumber}
-                      dayNumber={selectedDay}
-                      taskType="review"
                       taskName="New Words & Evaluation"
                       isCompleted={
                         taskCompletions[
