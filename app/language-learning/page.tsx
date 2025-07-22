@@ -115,27 +115,12 @@ const YearlyProgressChart = () => {
     };
     window.addEventListener("localStorageChanged", handleCustomStorageChange);
 
-    // Vocabulary değişikliklerini dinle
-    const handleVocabularyChange = () => {
-      console.log("🔄 Vocabulary progress changed event alındı");
-      const vocabProgress = VocabularyManager.getOverallProgress();
-      setVocabularyProgress(vocabProgress);
-    };
-    window.addEventListener(
-      "vocabularyProgressChanged",
-      handleVocabularyChange
-    );
-
     // Cleanup
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener(
         "localStorageChanged",
         handleCustomStorageChange
-      );
-      window.removeEventListener(
-        "vocabularyProgressChanged",
-        handleVocabularyChange
       );
     };
   }, []);
@@ -510,6 +495,28 @@ export default function LanguageLearning() {
     setOverallStats(stats);
     setCurrentWeek(activeWeek);
     setVocabularyProgress(vocabProgress);
+
+    // Vocabulary değişikliklerini dinle
+    const handleVocabularyChange = () => {
+      console.log("🔄 Vocabulary progress changed event alındı");
+      const vocabProgress = VocabularyManager.getOverallProgress();
+      setVocabularyProgress(vocabProgress);
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(
+        "vocabularyProgressChanged",
+        handleVocabularyChange
+      );
+
+      // Cleanup
+      return () => {
+        window.removeEventListener(
+          "vocabularyProgressChanged",
+          handleVocabularyChange
+        );
+      };
+    }
   }, []);
 
   // Handle opening words modal
