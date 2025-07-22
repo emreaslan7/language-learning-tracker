@@ -1272,7 +1272,7 @@ export default function LanguageLearning() {
             </div>
 
             {/* Debug Vocabulary Sync Button */}
-            <div className="mt-6">
+            <div className="mt-6 flex gap-4 justify-center">
               <button
                 onClick={async () => {
                   console.log("🔧 Manuel vocabulary sync başlatılıyor...");
@@ -1289,6 +1289,43 @@ export default function LanguageLearning() {
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
               >
                 🔧 Debug: Vocabulary Sync to Firebase
+              </button>
+
+              <button
+                onClick={() => {
+                  console.log("📊 LocalStorage Vocabulary Debug:");
+                  const progressData = localStorage.getItem(
+                    "vocabulary-progress"
+                  );
+                  const userData = localStorage.getItem("vocabulary-user-data");
+
+                  if (progressData) {
+                    const parsed = JSON.parse(progressData);
+                    console.log("Progress Data:", {
+                      kelimeSayisi: Object.keys(parsed).length,
+                      kelimeler: Object.keys(parsed),
+                      detay: parsed,
+                    });
+                  } else {
+                    console.log("❌ Progress data bulunamadı");
+                  }
+
+                  if (userData) {
+                    const parsed = JSON.parse(userData);
+                    console.log("User Data:", {
+                      kelimeSayisi: Object.keys(parsed).length,
+                      kelimeler: Object.keys(parsed),
+                      detay: parsed,
+                    });
+                  } else {
+                    console.log("❌ User data bulunamadı");
+                  }
+
+                  alert("localStorage verisi console'a yazdırıldı!");
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+              >
+                📊 Debug: Check localStorage
               </button>
             </div>
           </div>

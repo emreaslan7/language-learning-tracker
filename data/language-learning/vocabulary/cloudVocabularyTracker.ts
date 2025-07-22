@@ -1,4 +1,4 @@
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 
 // Vocabulary progress interface
@@ -43,7 +43,28 @@ export class CloudVocabularyTracker {
     [key: string]: WordProgress;
   }): Promise<boolean> {
     try {
+      console.log(`🔄 Firebase'e gönderilecek veri:`, {
+        kelimeSayisi: Object.keys(progressData).length,
+        kelimeler: Object.keys(progressData),
+        ilkKelimeDetay: Object.keys(progressData)[0]
+          ? progressData[Object.keys(progressData)[0]]
+          : null,
+      });
+
       const docRef = doc(db, this.COLLECTION_NAME, this.PROGRESS_DOC);
+
+      // Önce mevcut veriyi oku (race condition'ı önlemek için)
+      const existingDoc = await getDoc(docRef);
+      let existingProgress = {};
+      if (existingDoc.exists()) {
+        const data = existingDoc.data();
+        existingProgress = data.progress || {};
+        console.log(
+          `📖 Firebase'den mevcut veri okundu: ${
+            Object.keys(existingProgress).length
+          } kelime`
+        );
+      }
 
       // Firebase için undefined ve Date değerleri null'a çevir
       const cleanedProgress = Object.keys(progressData).reduce((acc, key) => {
@@ -60,15 +81,24 @@ export class CloudVocabularyTracker {
         return acc;
       }, {} as Record<string, CleanedWordProgress>);
 
+      // Mevcut veriyle merge et
+      const mergedProgress = { ...existingProgress, ...cleanedProgress };
+
+      console.log(`🧹 Merge edilmiş veri:`, {
+        eskiKelimeSayisi: Object.keys(existingProgress).length,
+        yeniKelimeSayisi: Object.keys(cleanedProgress).length,
+        toplamKelimeSayisi: Object.keys(mergedProgress).length,
+      });
+
       await setDoc(docRef, {
-        progress: cleanedProgress,
+        progress: mergedProgress,
         lastUpdated: new Date(),
         version: 1,
       });
 
       console.log(
-        `✅ Vocabulary progress Firebase'e kaydedildi (${
-          Object.keys(progressData).length
+        `✅ Vocabulary progress Firebase'e kaydedildi (toplam: ${
+          Object.keys(mergedProgress).length
         } kelime)`
       );
       return true;
