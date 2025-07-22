@@ -252,8 +252,9 @@ export class VocabularyManager {
         // Önce localStorage'a kaydet
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(progressData));
 
-        // Firebase'e sync et - wait for completion
+        // Firebase'e sync et - TÜM localStorage verisini gönder (user data sistemi gibi)
         try {
+          // localStorage'daki tüm veriyi gönder (progressData zaten tüm veriyi içeriyor)
           await CloudVocabularyTracker.saveProgressToCloud(progressData);
 
           // UI'ı güncelle

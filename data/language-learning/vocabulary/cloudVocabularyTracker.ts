@@ -86,39 +86,31 @@ export class CloudVocabularyTracker {
     try {
       const docRef = doc(db, this.COLLECTION_NAME, this.PROGRESS_DOC);
 
-      // localStorage'dan tüm mevcut verileri al
-      let allProgressData: { [key: string]: WordProgress };
-      if (typeof window !== "undefined") {
-        const stored = localStorage.getItem("vocabulary-progress");
-        allProgressData = stored ? JSON.parse(stored) : {};
-      } else {
-        allProgressData = progressData;
-      }
-
       // Firebase için undefined ve Date değerleri null'a çevir
-      const cleanedProgress = Object.keys(allProgressData).reduce(
-        (acc, key) => {
-          const item = allProgressData[key];
-          acc[key] = {
-            ...item,
-            lastReviewDate: item.lastReviewDate
-              ? item.lastReviewDate.toISOString()
-              : null,
-            nextReviewDate: item.nextReviewDate
-              ? item.nextReviewDate.toISOString()
-              : null,
-          };
-          return acc;
-        },
-        {} as Record<string, CleanedWordProgress>
-      );
+      const cleanedProgress = Object.keys(progressData).reduce((acc, key) => {
+        const item = progressData[key];
+        acc[key] = {
+          ...item,
+          lastReviewDate: item.lastReviewDate
+            ? item.lastReviewDate.toISOString()
+            : null,
+          nextReviewDate: item.nextReviewDate
+            ? item.nextReviewDate.toISOString()
+            : null,
+        };
+        return acc;
+      }, {} as Record<string, CleanedWordProgress>);
 
-      // localStorage'daki tüm progress verilerini Firebase'e kaydet
-      await setDoc(docRef, {
-        progress: cleanedProgress,
-        lastUpdated: new Date(),
-        version: 1,
-      });
+      // progress field'ını merge et (user data sistemi gibi)
+      await setDoc(
+        docRef,
+        {
+          progress: cleanedProgress,
+          lastUpdated: new Date(),
+          version: 1,
+        },
+        { merge: true }
+      );
 
       return true;
     } catch (error) {
