@@ -49,6 +49,7 @@ export class CloudVocabularyTracker {
       // Progress verisi çek ve localStorage'a yaz
       const progressData = await this.loadProgressFromCloud();
       if (Object.keys(progressData).length > 0) {
+        // Mevcut localStorage verisiyle birleştir (üzerine yazma)
         localStorage.setItem(
           "vocabulary-progress",
           JSON.stringify(progressData)
@@ -58,11 +59,17 @@ export class CloudVocabularyTracker {
             Object.keys(progressData).length
           } kelime)`
         );
+        console.log(
+          "📋 Firebase'den alınan progress verileri:",
+          Object.keys(progressData)
+        );
 
         // UI'ı güncelle
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("vocabularyProgressChanged"));
         }
+      } else {
+        console.log("📝 Firebase'de progress verisi bulunamadı");
       }
 
       // User data çek ve localStorage'a yaz
@@ -79,6 +86,8 @@ export class CloudVocabularyTracker {
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("vocabularyUserDataChanged"));
         }
+      } else {
+        console.log("📝 Firebase'de user data bulunamadı");
       }
 
       return {
@@ -168,12 +177,19 @@ export class CloudVocabularyTracker {
     [key: string]: WordProgress;
   }> {
     try {
+      console.log(
+        `🔍 Firebase'den progress yükleniyor: ${this.COLLECTION_NAME}/${this.PROGRESS_DOC}`
+      );
       const docRef = doc(db, this.COLLECTION_NAME, this.PROGRESS_DOC);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
         const data = docSnap.data();
+        console.log("📋 Firebase'den alınan raw data:", data);
         const rawProgress = data.progress || {};
+        console.log(
+          `📊 Raw progress verisi: ${Object.keys(rawProgress).length} kelime`
+        );
 
         // String tarihlerini Date'e çevir
         const convertedProgress: { [key: string]: WordProgress } = {};
@@ -190,7 +206,12 @@ export class CloudVocabularyTracker {
           };
         });
 
-        console.log("✅ Vocabulary progress Firebase'den yüklendi");
+        console.log(
+          `✅ Vocabulary progress Firebase'den yüklendi (${
+            Object.keys(convertedProgress).length
+          } kelime)`
+        );
+        console.log("📋 Yüklenen kelimeler:", Object.keys(convertedProgress));
         return convertedProgress;
       } else {
         console.log("📝 Firebase'de vocabulary progress bulunamadı");
