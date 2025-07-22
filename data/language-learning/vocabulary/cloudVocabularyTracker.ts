@@ -92,10 +92,14 @@ export class CloudVocabularyTracker {
         acc[key] = {
           ...item,
           lastReviewDate: item.lastReviewDate
-            ? item.lastReviewDate.toISOString()
+            ? item.lastReviewDate instanceof Date
+              ? item.lastReviewDate.toISOString()
+              : item.lastReviewDate
             : null,
           nextReviewDate: item.nextReviewDate
-            ? item.nextReviewDate.toISOString()
+            ? item.nextReviewDate instanceof Date
+              ? item.nextReviewDate.toISOString()
+              : item.nextReviewDate
             : null,
         };
         return acc;
