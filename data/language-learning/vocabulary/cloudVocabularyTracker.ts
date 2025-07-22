@@ -86,28 +86,34 @@ export class CloudVocabularyTracker {
     try {
       const docRef = doc(db, this.COLLECTION_NAME, this.PROGRESS_DOC);
 
-      // Önce Firebase'den mevcut verileri al
-      const existingData = await this.loadProgressFromCloud();
-
-      // Mevcut veriler ile yeni verileri birleştir
-      const mergedProgress = { ...existingData, ...progressData };
+      // localStorage'dan tüm mevcut verileri al
+      let allProgressData: { [key: string]: WordProgress };
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("vocabulary-progress");
+        allProgressData = stored ? JSON.parse(stored) : {};
+      } else {
+        allProgressData = progressData;
+      }
 
       // Firebase için undefined ve Date değerleri null'a çevir
-      const cleanedProgress = Object.keys(mergedProgress).reduce((acc, key) => {
-        const item = mergedProgress[key];
-        acc[key] = {
-          ...item,
-          lastReviewDate: item.lastReviewDate
-            ? item.lastReviewDate.toISOString()
-            : null,
-          nextReviewDate: item.nextReviewDate
-            ? item.nextReviewDate.toISOString()
-            : null,
-        };
-        return acc;
-      }, {} as Record<string, CleanedWordProgress>);
+      const cleanedProgress = Object.keys(allProgressData).reduce(
+        (acc, key) => {
+          const item = allProgressData[key];
+          acc[key] = {
+            ...item,
+            lastReviewDate: item.lastReviewDate
+              ? item.lastReviewDate.toISOString()
+              : null,
+            nextReviewDate: item.nextReviewDate
+              ? item.nextReviewDate.toISOString()
+              : null,
+          };
+          return acc;
+        },
+        {} as Record<string, CleanedWordProgress>
+      );
 
-      // Tüm progress verilerini Firebase'e kaydet
+      // localStorage'daki tüm progress verilerini Firebase'e kaydet
       await setDoc(docRef, {
         progress: cleanedProgress,
         lastUpdated: new Date(),
