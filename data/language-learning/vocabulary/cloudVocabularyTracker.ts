@@ -43,8 +43,6 @@ export class CloudVocabularyTracker {
     progressLoaded: boolean;
     userDataLoaded: boolean;
   }> {
-    console.log("🚀 Firebase'den vocabulary verisi çekiliyor...");
-
     try {
       // Progress verisi çek ve localStorage'a yaz
       const progressData = await this.loadProgressFromCloud();
@@ -54,40 +52,22 @@ export class CloudVocabularyTracker {
           "vocabulary-progress",
           JSON.stringify(progressData)
         );
-        console.log(
-          `✅ Progress data Firebase'den localStorage'a yazıldı (${
-            Object.keys(progressData).length
-          } kelime)`
-        );
-        console.log(
-          "📋 Firebase'den alınan progress verileri:",
-          Object.keys(progressData)
-        );
 
         // UI'ı güncelle
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("vocabularyProgressChanged"));
         }
-      } else {
-        console.log("📝 Firebase'de progress verisi bulunamadı");
       }
 
       // User data çek ve localStorage'a yaz
       const userData = await this.loadUserDataFromCloud();
       if (Object.keys(userData).length > 0) {
         localStorage.setItem("vocabulary-user-data", JSON.stringify(userData));
-        console.log(
-          `✅ User data Firebase'den localStorage'a yazıldı (${
-            Object.keys(userData).length
-          } kelime)`
-        );
 
         // UI'ı güncelle
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("vocabularyUserDataChanged"));
         }
-      } else {
-        console.log("📝 Firebase'de user data bulunamadı");
       }
 
       return {
@@ -135,11 +115,6 @@ export class CloudVocabularyTracker {
         version: 1,
       });
 
-      console.log(
-        `✅ Progress data Firebase'e kaydedildi (${
-          Object.keys(progressData).length
-        } kelime)`
-      );
       return true;
     } catch (error) {
       console.error("❌ Firebase progress kayıt hatası:", error);
@@ -177,19 +152,12 @@ export class CloudVocabularyTracker {
     [key: string]: WordProgress;
   }> {
     try {
-      console.log(
-        `🔍 Firebase'den progress yükleniyor: ${this.COLLECTION_NAME}/${this.PROGRESS_DOC}`
-      );
       const docRef = doc(db, this.COLLECTION_NAME, this.PROGRESS_DOC);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
         const data = docSnap.data();
-        console.log("📋 Firebase'den alınan raw data:", data);
         const rawProgress = data.progress || {};
-        console.log(
-          `📊 Raw progress verisi: ${Object.keys(rawProgress).length} kelime`
-        );
 
         // String tarihlerini Date'e çevir
         const convertedProgress: { [key: string]: WordProgress } = {};
@@ -206,15 +174,8 @@ export class CloudVocabularyTracker {
           };
         });
 
-        console.log(
-          `✅ Vocabulary progress Firebase'den yüklendi (${
-            Object.keys(convertedProgress).length
-          } kelime)`
-        );
-        console.log("📋 Yüklenen kelimeler:", Object.keys(convertedProgress));
         return convertedProgress;
       } else {
-        console.log("📝 Firebase'de vocabulary progress bulunamadı");
         return {};
       }
     } catch (error) {
@@ -233,10 +194,8 @@ export class CloudVocabularyTracker {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
-        console.log("✅ Vocabulary user data Firebase'den yüklendi");
         return data.userData || {};
       } else {
-        console.log("📝 Firebase'de vocabulary user data bulunamadı");
         return {};
       }
     } catch (error) {

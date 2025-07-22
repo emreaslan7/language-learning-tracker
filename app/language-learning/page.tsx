@@ -62,7 +62,6 @@ const YearlyProgressChart = () => {
       // Vocabulary progress state'ini güncelle (eğer varsa)
       window.dispatchEvent(new CustomEvent("vocabularyProgressChanged"));
       window.dispatchEvent(new CustomEvent("vocabularyUserDataChanged"));
-      console.log("🔄 Vocabulary UI refresh tetiklendi");
     }
   };
 
@@ -86,11 +85,7 @@ const YearlyProgressChart = () => {
 
       // 🚀 YENİ VOCABULARY SİSTEMİ: Firebase → localStorage → Firebase döngüsü
       try {
-        console.log(
-          "🚀 YENİ SİSTEM: Vocabulary Firebase döngüsü başlatılıyor..."
-        );
         await VocabularyManager.initializeVocabulary();
-        console.log("✅ Vocabulary Firebase döngüsü başlatıldı");
 
         // Vocabulary verileri yüklendikten sonra UI'ı refresh et
         refreshVocabularyData();
@@ -498,7 +493,6 @@ export default function LanguageLearning() {
 
     // Vocabulary değişikliklerini dinle
     const handleVocabularyChange = () => {
-      console.log("🔄 Vocabulary progress changed event alındı");
       const vocabProgress = VocabularyManager.getOverallProgress();
       setVocabularyProgress(vocabProgress);
     };

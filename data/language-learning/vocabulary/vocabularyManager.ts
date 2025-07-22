@@ -124,8 +124,6 @@ export class VocabularyManager {
       return;
     }
 
-    console.log(`📚 Kelime öğrenildi olarak işaretleniyor: ${wordId}`);
-
     const progressData = this.getStoredProgress();
     const currentProgress = progressData[wordId] || {
       wordId,
@@ -151,11 +149,6 @@ export class VocabularyManager {
 
     progressData[wordId] = updatedProgress;
 
-    console.log(
-      `💾 Progress data güncellendi, toplam kelime sayısı: ${
-        Object.keys(progressData).length
-      }`
-    );
     await this.saveProgress(progressData);
   }
 
@@ -164,8 +157,6 @@ export class VocabularyManager {
     if (typeof window === "undefined") {
       return;
     }
-
-    console.log(`❓ Kelime karıştırıldı olarak işaretleniyor: ${wordId}`);
 
     const progressData = this.getStoredProgress();
     const currentProgress = progressData[wordId] || {
@@ -192,11 +183,6 @@ export class VocabularyManager {
 
     progressData[wordId] = updatedProgress;
 
-    console.log(
-      `💾 Progress data güncellendi, toplam kelime sayısı: ${
-        Object.keys(progressData).length
-      }`
-    );
     await this.saveProgress(progressData);
   }
 
@@ -248,11 +234,6 @@ export class VocabularyManager {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       const parsed = stored ? JSON.parse(stored) : {};
-      console.log(
-        `📖 localStorage'dan yüklenen progress: ${
-          Object.keys(parsed).length
-        } kelime`
-      );
       return parsed;
     } catch (error) {
       console.error("Error reading progress data:", error);
@@ -279,27 +260,10 @@ export class VocabularyManager {
 
         // Önce localStorage'a kaydet
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(progressData));
-        console.log(
-          `💾 Vocabulary progress localStorage güncellendi (${
-            Object.keys(progressData).length
-          } kelime)`
-        );
 
         // Firebase'e sync et - wait for completion
         try {
-          console.log(`☁️ Firebase sync başlatılıyor...`);
-          const success = await CloudVocabularyTracker.saveProgressToCloud(
-            progressData
-          );
-          if (success) {
-            console.log(
-              `☁️ Vocabulary progress Firebase sync tamamlandı (${
-                Object.keys(progressData).length
-              } kelime)`
-            );
-          } else {
-            console.warn("⚠️ Vocabulary progress Firebase sync başarısız oldu");
-          }
+          await CloudVocabularyTracker.saveProgressToCloud(progressData);
 
           // UI'ı güncelle
           if (typeof window !== "undefined") {
@@ -585,52 +549,11 @@ export class VocabularyManager {
     }
 
     try {
-      console.log("🚀 Vocabulary sistem başlatılıyor - YENİ DÖNGÜ SİSTEMİ...");
-
       // 1. İlk olarak Firebase'den veri çek ve localStorage'a yaz
-      console.log("📥 1. Adım: Firebase'den veri çekiliyor...");
       await CloudVocabularyTracker.loadAndSyncFromFirebase();
-
-      // 2. Auto-sync'i başlat (localStorage değişikliklerini Firebase'e gönder)
-      console.log("🔄 2. Adım: Auto-sync sistemi başlatılıyor...");
-      this.startAutoSync();
-
-      console.log(
-        "✅ Vocabulary sistem başlatıldı - Firebase→localStorage→Firebase döngüsü aktif"
-      );
     } catch (error) {
       console.error("❌ Vocabulary sistem başlatma hatası:", error);
     }
-  }
-
-  // Auto-sync functionality - her 30 saniyede bir kontrol et
-  private static startAutoSync(): void {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    setInterval(async () => {
-      try {
-        const progressData = this.getStoredProgress();
-        const userData = this.getUserData();
-
-        // Eğer localStorage'da veri varsa ve son sync'ten beri değişiklik olduysa
-        if (Object.keys(progressData).length > 0) {
-          console.log("🔄 Auto-sync: Progress data kontrol ediliyor...");
-          await CloudVocabularyTracker.saveProgressToCloud(progressData);
-        }
-
-        if (Object.keys(userData).length > 0) {
-          console.log("🔄 Auto-sync: User data kontrol ediliyor...");
-          await CloudVocabularyTracker.saveUserDataToCloud(userData);
-        }
-      } catch (error) {
-        console.log(
-          "⚠️ Auto-sync hatası (normal, internet bağlantısı olabilir):",
-          error
-        );
-      }
-    }, 30000); // 30 saniye
   }
 
   // Manuel olarak tüm localStorage verilerini Firebase'e zorla gönder
