@@ -578,22 +578,26 @@ export class VocabularyManager {
     }
   }
 
-  // Initialize vocabulary system (uygulama başlangıcında çağır)
+  // 🚀 YENİ SİSTEM: Initialize vocabulary system
   static async initializeVocabulary(): Promise<void> {
     if (typeof window === "undefined") {
       return;
     }
 
     try {
-      console.log("🚀 Vocabulary sistem başlatılıyor...");
+      console.log("🚀 Vocabulary sistem başlatılıyor - YENİ DÖNGÜ SİSTEMİ...");
 
-      // Her iki veri türünü de sync et
-      await Promise.all([this.syncProgressData(), this.syncUserData()]);
+      // 1. İlk olarak Firebase'den veri çek ve localStorage'a yaz
+      console.log("📥 1. Adım: Firebase'den veri çekiliyor...");
+      await CloudVocabularyTracker.loadAndSyncFromFirebase();
 
-      // Auto-sync'i başlat (her 30 saniyede bir kontrol et)
+      // 2. Auto-sync'i başlat (localStorage değişikliklerini Firebase'e gönder)
+      console.log("🔄 2. Adım: Auto-sync sistemi başlatılıyor...");
       this.startAutoSync();
 
-      console.log("✅ Vocabulary sistem başlatıldı");
+      console.log(
+        "✅ Vocabulary sistem başlatıldı - Firebase→localStorage→Firebase döngüsü aktif"
+      );
     } catch (error) {
       console.error("❌ Vocabulary sistem başlatma hatası:", error);
     }

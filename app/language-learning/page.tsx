@@ -56,6 +56,16 @@ const YearlyProgressChart = () => {
     setStats(statsData);
   };
 
+  // Vocabulary verilerini yenile
+  const refreshVocabularyData = () => {
+    if (typeof window !== "undefined") {
+      // Vocabulary progress state'ini güncelle (eğer varsa)
+      window.dispatchEvent(new CustomEvent("vocabularyProgressChanged"));
+      window.dispatchEvent(new CustomEvent("vocabularyUserDataChanged"));
+      console.log("🔄 Vocabulary UI refresh tetiklendi");
+    }
+  };
+
   useEffect(() => {
     setMounted(true);
 
@@ -74,12 +84,18 @@ const YearlyProgressChart = () => {
         console.warn("⚠️ Main progress cloud sync başlatılamadı:", error);
       }
 
-      // Vocabulary cloud sync'i başlat
+      // 🚀 YENİ VOCABULARY SİSTEMİ: Firebase → localStorage → Firebase döngüsü
       try {
+        console.log(
+          "🚀 YENİ SİSTEM: Vocabulary Firebase döngüsü başlatılıyor..."
+        );
         await VocabularyManager.initializeVocabulary();
-        console.log("✅ Vocabulary cloud sync başlatıldı");
+        console.log("✅ Vocabulary Firebase döngüsü başlatıldı");
+
+        // Vocabulary verileri yüklendikten sonra UI'ı refresh et
+        refreshVocabularyData();
       } catch (error) {
-        console.warn("⚠️ Vocabulary cloud sync başlatılamadı:", error);
+        console.warn("⚠️ Vocabulary Firebase döngüsü başlatılamadı:", error);
       }
     };
 
@@ -99,12 +115,27 @@ const YearlyProgressChart = () => {
     };
     window.addEventListener("localStorageChanged", handleCustomStorageChange);
 
+    // Vocabulary değişikliklerini dinle
+    const handleVocabularyChange = () => {
+      console.log("🔄 Vocabulary progress changed event alındı");
+      const vocabProgress = VocabularyManager.getOverallProgress();
+      setVocabularyProgress(vocabProgress);
+    };
+    window.addEventListener(
+      "vocabularyProgressChanged",
+      handleVocabularyChange
+    );
+
     // Cleanup
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener(
         "localStorageChanged",
         handleCustomStorageChange
+      );
+      window.removeEventListener(
+        "vocabularyProgressChanged",
+        handleVocabularyChange
       );
     };
   }, []);

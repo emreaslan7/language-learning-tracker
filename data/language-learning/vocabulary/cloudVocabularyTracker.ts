@@ -1,4 +1,4 @@
-import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 
 // Vocabulary progress interface
@@ -38,33 +38,71 @@ export class CloudVocabularyTracker {
   private static PROGRESS_DOC = "main_vocabulary_progress"; // Sabit progress document ID
   private static USER_DATA_DOC = "main_vocabulary_userdata"; // Sabit user data document ID
 
-  // Vocabulary progress'i Firebase'e kaydet
+  // 🔄 YENI SİSTEM: Firebase'den veri çek ve localStorage'a yaz
+  static async loadAndSyncFromFirebase(): Promise<{
+    progressLoaded: boolean;
+    userDataLoaded: boolean;
+  }> {
+    console.log("🚀 Firebase'den vocabulary verisi çekiliyor...");
+
+    try {
+      // Progress verisi çek ve localStorage'a yaz
+      const progressData = await this.loadProgressFromCloud();
+      if (Object.keys(progressData).length > 0) {
+        localStorage.setItem(
+          "vocabulary-progress",
+          JSON.stringify(progressData)
+        );
+        console.log(
+          `✅ Progress data Firebase'den localStorage'a yazıldı (${
+            Object.keys(progressData).length
+          } kelime)`
+        );
+
+        // UI'ı güncelle
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("vocabularyProgressChanged"));
+        }
+      }
+
+      // User data çek ve localStorage'a yaz
+      const userData = await this.loadUserDataFromCloud();
+      if (Object.keys(userData).length > 0) {
+        localStorage.setItem("vocabulary-user-data", JSON.stringify(userData));
+        console.log(
+          `✅ User data Firebase'den localStorage'a yazıldı (${
+            Object.keys(userData).length
+          } kelime)`
+        );
+
+        // UI'ı güncelle
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("vocabularyUserDataChanged"));
+        }
+      }
+
+      return {
+        progressLoaded: Object.keys(progressData).length > 0,
+        userDataLoaded: Object.keys(userData).length > 0,
+      };
+    } catch (error) {
+      console.error("❌ Firebase'den veri çekme hatası:", error);
+      return { progressLoaded: false, userDataLoaded: false };
+    }
+  }
+
+  // 📤 localStorage'dan Firebase'e progress kaydet
   static async saveProgressToCloud(progressData: {
     [key: string]: WordProgress;
   }): Promise<boolean> {
     try {
-      console.log(`🔄 Firebase'e gönderilecek veri:`, {
-        kelimeSayisi: Object.keys(progressData).length,
-        kelimeler: Object.keys(progressData),
-        ilkKelimeDetay: Object.keys(progressData)[0]
-          ? progressData[Object.keys(progressData)[0]]
-          : null,
-      });
+      console.log(
+        `� Progress data Firebase'e gönderiliyor (${
+          Object.keys(progressData).length
+        } kelime)...`
+      );
 
       const docRef = doc(db, this.COLLECTION_NAME, this.PROGRESS_DOC);
-
-      // Önce mevcut veriyi oku (race condition'ı önlemek için)
-      const existingDoc = await getDoc(docRef);
-      let existingProgress = {};
-      if (existingDoc.exists()) {
-        const data = existingDoc.data();
-        existingProgress = data.progress || {};
-        console.log(
-          `📖 Firebase'den mevcut veri okundu: ${
-            Object.keys(existingProgress).length
-          } kelime`
-        );
-      }
 
       // Firebase için undefined ve Date değerleri null'a çevir
       const cleanedProgress = Object.keys(progressData).reduce((acc, key) => {
@@ -81,34 +119,26 @@ export class CloudVocabularyTracker {
         return acc;
       }, {} as Record<string, CleanedWordProgress>);
 
-      // Mevcut veriyle merge et
-      const mergedProgress = { ...existingProgress, ...cleanedProgress };
-
-      console.log(`🧹 Merge edilmiş veri:`, {
-        eskiKelimeSayisi: Object.keys(existingProgress).length,
-        yeniKelimeSayisi: Object.keys(cleanedProgress).length,
-        toplamKelimeSayisi: Object.keys(mergedProgress).length,
-      });
-
+      // Doğrudan setDoc kullanarak tüm progress field'ını güncelle
       await setDoc(docRef, {
-        progress: mergedProgress,
+        progress: cleanedProgress,
         lastUpdated: new Date(),
         version: 1,
       });
 
       console.log(
-        `✅ Vocabulary progress Firebase'e kaydedildi (toplam: ${
-          Object.keys(mergedProgress).length
+        `✅ Progress data Firebase'e kaydedildi (${
+          Object.keys(progressData).length
         } kelime)`
       );
       return true;
     } catch (error) {
-      console.error("❌ Firebase vocabulary progress kayıt hatası:", error);
+      console.error("❌ Firebase progress kayıt hatası:", error);
       return false;
     }
   }
 
-  // User data'yı Firebase'e kaydet
+  // 📤 localStorage'dan Firebase'e user data kaydet
   static async saveUserDataToCloud(userData: {
     [key: string]: UserWordData;
   }): Promise<boolean> {
