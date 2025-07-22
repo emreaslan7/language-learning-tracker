@@ -86,9 +86,15 @@ export class CloudVocabularyTracker {
     try {
       const docRef = doc(db, this.COLLECTION_NAME, this.PROGRESS_DOC);
 
+      // Önce Firebase'den mevcut verileri al
+      const existingData = await this.loadProgressFromCloud();
+
+      // Mevcut veriler ile yeni verileri birleştir
+      const mergedProgress = { ...existingData, ...progressData };
+
       // Firebase için undefined ve Date değerleri null'a çevir
-      const cleanedProgress = Object.keys(progressData).reduce((acc, key) => {
-        const item = progressData[key];
+      const cleanedProgress = Object.keys(mergedProgress).reduce((acc, key) => {
+        const item = mergedProgress[key];
         acc[key] = {
           ...item,
           lastReviewDate: item.lastReviewDate
@@ -101,16 +107,12 @@ export class CloudVocabularyTracker {
         return acc;
       }, {} as Record<string, CleanedWordProgress>);
 
-      // setDoc merge: true kullanarak mevcut verileri koru
-      await setDoc(
-        docRef,
-        {
-          progress: cleanedProgress,
-          lastUpdated: new Date(),
-          version: 1,
-        },
-        { merge: true }
-      );
+      // Tüm progress verilerini Firebase'e kaydet
+      await setDoc(docRef, {
+        progress: cleanedProgress,
+        lastUpdated: new Date(),
+        version: 1,
+      });
 
       return true;
     } catch (error) {
