@@ -217,11 +217,6 @@ export class VocabularyManager {
 
     progressData[wordId] = updatedProgress;
 
-    console.log(
-      `💾 Progress data güncellendi, toplam kelime sayısı: ${
-        Object.keys(progressData).length
-      }`
-    );
     await this.saveProgress(progressData);
   }
 
@@ -254,10 +249,6 @@ export class VocabularyManager {
     // Queue the save operation to prevent race conditions
     this.saveQueue = this.saveQueue.then(async () => {
       try {
-        console.log(
-          `💾 Save başlatılıyor: ${Object.keys(progressData).length} kelime`
-        );
-
         // Önce localStorage'a kaydet
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(progressData));
 

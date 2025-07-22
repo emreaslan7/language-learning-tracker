@@ -35,10 +35,10 @@ interface CleanedWordProgress {
 
 export class CloudVocabularyTracker {
   private static COLLECTION_NAME = "vocabulary_data";
-  private static PROGRESS_DOC = "main_vocabulary_progress"; // Sabit progress document ID
-  private static USER_DATA_DOC = "main_vocabulary_userdata"; // Sabit user data document ID
+  private static PROGRESS_DOC = "main_vocabulary_progress";
+  private static USER_DATA_DOC = "main_vocabulary_userdata";
 
-  // 🔄 YENI SİSTEM: Firebase'den veri çek ve localStorage'a yaz
+  // Firebase'den veri çek ve localStorage'a yaz
   static async loadAndSyncFromFirebase(): Promise<{
     progressLoaded: boolean;
     userDataLoaded: boolean;
@@ -47,7 +47,6 @@ export class CloudVocabularyTracker {
       // Progress verisi çek ve localStorage'a yaz
       const progressData = await this.loadProgressFromCloud();
       if (Object.keys(progressData).length > 0) {
-        // Mevcut localStorage verisiyle birleştir (üzerine yazma)
         localStorage.setItem(
           "vocabulary-progress",
           JSON.stringify(progressData)
@@ -80,17 +79,11 @@ export class CloudVocabularyTracker {
     }
   }
 
-  // 📤 localStorage'dan Firebase'e progress kaydet
+  // localStorage'dan Firebase'e progress kaydet
   static async saveProgressToCloud(progressData: {
     [key: string]: WordProgress;
   }): Promise<boolean> {
     try {
-      console.log(
-        `� Progress data Firebase'e gönderiliyor (${
-          Object.keys(progressData).length
-        } kelime)...`
-      );
-
       const docRef = doc(db, this.COLLECTION_NAME, this.PROGRESS_DOC);
 
       // Firebase için undefined ve Date değerleri null'a çevir
@@ -108,12 +101,16 @@ export class CloudVocabularyTracker {
         return acc;
       }, {} as Record<string, CleanedWordProgress>);
 
-      // Doğrudan setDoc kullanarak tüm progress field'ını güncelle
-      await setDoc(docRef, {
-        progress: cleanedProgress,
-        lastUpdated: new Date(),
-        version: 1,
-      });
+      // setDoc merge: true kullanarak mevcut verileri koru
+      await setDoc(
+        docRef,
+        {
+          progress: cleanedProgress,
+          lastUpdated: new Date(),
+          version: 1,
+        },
+        { merge: true }
+      );
 
       return true;
     } catch (error) {
@@ -122,24 +119,23 @@ export class CloudVocabularyTracker {
     }
   }
 
-  // 📤 localStorage'dan Firebase'e user data kaydet
+  // localStorage'dan Firebase'e user data kaydet
   static async saveUserDataToCloud(userData: {
     [key: string]: UserWordData;
   }): Promise<boolean> {
     try {
       const docRef = doc(db, this.COLLECTION_NAME, this.USER_DATA_DOC);
 
-      await setDoc(docRef, {
-        userData,
-        lastUpdated: new Date(),
-        version: 1,
-      });
-
-      console.log(
-        `✅ Vocabulary user data Firebase'e kaydedildi (${
-          Object.keys(userData).length
-        } kelime)`
+      await setDoc(
+        docRef,
+        {
+          userData,
+          lastUpdated: new Date(),
+          version: 1,
+        },
+        { merge: true }
       );
+
       return true;
     } catch (error) {
       console.error("❌ Firebase vocabulary user data kayıt hatası:", error);
@@ -210,28 +206,17 @@ export class CloudVocabularyTracker {
     source: string;
   }> {
     try {
-      console.log("🔄 Vocabulary progress sync başlatılıyor...");
-
       // Cloud'dan progress al
       const cloudData = await this.loadProgressFromCloud();
-      console.log(
-        "☁️ Cloud'dan alınan vocabulary progress sayısı:",
-        Object.keys(cloudData).length
-      );
 
       // Local'deki progress'i al
       const localDataStr = localStorage.getItem("vocabulary-progress");
       const localData = localDataStr ? JSON.parse(localDataStr) : {};
-      console.log(
-        "💾 Local'deki vocabulary progress sayısı:",
-        Object.keys(localData).length
-      );
 
       if (
         Object.keys(cloudData).length === 0 &&
         Object.keys(localData).length === 0
       ) {
-        console.log("ℹ️ Hem cloud hem local vocabulary progress boş");
         return { success: true, source: "empty" };
       }
 
@@ -240,7 +225,6 @@ export class CloudVocabularyTracker {
         Object.keys(localData).length === 0
       ) {
         // Sadece cloud'da veri var, local'e koy
-        console.log("📥 Vocabulary progress cloud'dan local'e kopyalanıyor");
         localStorage.setItem("vocabulary-progress", JSON.stringify(cloudData));
 
         // UI'ı güncelle
@@ -256,13 +240,11 @@ export class CloudVocabularyTracker {
         Object.keys(cloudData).length === 0
       ) {
         // Sadece local'de veri var, cloud'a yükle
-        console.log("📤 Vocabulary progress local'den cloud'a yükleniyor");
         await this.saveProgressToCloud(localData);
         return { success: true, source: "local" };
       }
 
       // Her ikisinde de veri var, merge et
-      console.log("🔀 Vocabulary progress verileri merge ediliyor");
       const mergedData = this.mergeProgressData(localData, cloudData);
 
       // Merge edilen veriyi her iki yere de kaydet
@@ -274,10 +256,6 @@ export class CloudVocabularyTracker {
         window.dispatchEvent(new CustomEvent("vocabularyProgressChanged"));
       }
 
-      console.log(
-        "✅ Vocabulary progress sync tamamlandı, toplam veri:",
-        Object.keys(mergedData).length
-      );
       return { success: true, source: "merged" };
     } catch (error) {
       console.error("❌ Vocabulary progress sync hatası:", error);
@@ -288,28 +266,17 @@ export class CloudVocabularyTracker {
   // User data senkronizasyonu
   static async syncUserData(): Promise<{ success: boolean; source: string }> {
     try {
-      console.log("🔄 Vocabulary user data sync başlatılıyor...");
-
       // Cloud'dan user data al
       const cloudData = await this.loadUserDataFromCloud();
-      console.log(
-        "☁️ Cloud'dan alınan user data sayısı:",
-        Object.keys(cloudData).length
-      );
 
       // Local'deki user data'yı al
       const localDataStr = localStorage.getItem("vocabulary-user-data");
       const localData = localDataStr ? JSON.parse(localDataStr) : {};
-      console.log(
-        "💾 Local'deki user data sayısı:",
-        Object.keys(localData).length
-      );
 
       if (
         Object.keys(cloudData).length === 0 &&
         Object.keys(localData).length === 0
       ) {
-        console.log("ℹ️ Hem cloud hem local user data boş");
         return { success: true, source: "empty" };
       }
 
@@ -318,7 +285,6 @@ export class CloudVocabularyTracker {
         Object.keys(localData).length === 0
       ) {
         // Sadece cloud'da veri var, local'e koy
-        console.log("📥 User data cloud'dan local'e kopyalanıyor");
         localStorage.setItem("vocabulary-user-data", JSON.stringify(cloudData));
 
         // UI'ı güncelle
@@ -334,13 +300,11 @@ export class CloudVocabularyTracker {
         Object.keys(cloudData).length === 0
       ) {
         // Sadece local'de veri var, cloud'a yükle
-        console.log("📤 User data local'den cloud'a yükleniyor");
         await this.saveUserDataToCloud(localData);
         return { success: true, source: "local" };
       }
 
       // Her ikisinde de veri var, merge et (local öncelikli)
-      console.log("🔀 User data verileri merge ediliyor");
       const mergedData = { ...cloudData, ...localData }; // Local'deki değerler öncelikli
 
       // Merge edilen veriyi her iki yere de kaydet
@@ -352,10 +316,6 @@ export class CloudVocabularyTracker {
         window.dispatchEvent(new CustomEvent("vocabularyUserDataChanged"));
       }
 
-      console.log(
-        "✅ User data sync tamamlandı, toplam veri:",
-        Object.keys(mergedData).length
-      );
       return { success: true, source: "merged" };
     } catch (error) {
       console.error("❌ User data sync hatası:", error);
